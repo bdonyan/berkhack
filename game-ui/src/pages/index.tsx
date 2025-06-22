@@ -90,7 +90,6 @@ export default function Home() {
   };
 
   const endSession = async () => {
-    endSessionState();
     terminateConnections();
     const recordingResult = await stopStream();
 
@@ -118,6 +117,7 @@ export default function Home() {
       );
 
       try {
+        toast.loading('Analyzing your speech...');
         const audioBase64 = await blobToBase64(recordedBlob);
         
         const response = await fetch('http://localhost:3001/analyze-speech', {
@@ -132,6 +132,7 @@ export default function Home() {
           }),
         });
 
+        toast.dismiss();
         if (response.ok) {
           const feedback = await response.json();
           setSpeechFeedback(feedback);
@@ -143,9 +144,14 @@ export default function Home() {
           toast.error(`Error: ${errorMessage}`);
         }
       } catch (error) {
+        toast.dismiss();
         console.error("Failed to send audio for analysis", error);
         toast.error('Failed to send audio for analysis.');
+      } finally {
+        endSessionState();
       }
+    } else {
+      endSessionState();
     }
   };
 
@@ -239,7 +245,6 @@ export default function Home() {
 
             {/* Real-time Feedback */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FeedbackPanel speechFeedback={speechFeedback} visualFeedback={visualFeedback} />
               <FeedbackPanel speechFeedback={speechFeedback} visualFeedback={visualFeedback} />
             </div>
           </div>

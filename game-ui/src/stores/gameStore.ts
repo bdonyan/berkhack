@@ -160,13 +160,25 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
   
-  setSpeechFeedback: (feedback: SpeechFeedback) => set({
-    speechFeedback: feedback,
-  }),
+  setSpeechFeedback: (feedback: SpeechFeedback) => {
+    set((state) => {
+      const sessionHistory = [...state.sessionHistory];
+      if (sessionHistory.length > 0) {
+        sessionHistory[0].speechFeedback.push(feedback);
+      }
+      return { speechFeedback: feedback, sessionHistory };
+    });
+  },
   
-  setVisualFeedback: (feedback: VisualFeedback) => set({
-    visualFeedback: feedback,
-  }),
+  setVisualFeedback: (feedback: VisualFeedback) => {
+    set((state) => {
+      const sessionHistory = [...state.sessionHistory];
+      if (sessionHistory.length > 0) {
+        sessionHistory[0].visualFeedback.push(feedback);
+      }
+      return { visualFeedback: feedback, sessionHistory };
+    });
+  },
   
   setAudienceReaction: (reaction: AudienceReaction) => set({
     audienceReaction: reaction,
