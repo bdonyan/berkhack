@@ -1,0 +1,49 @@
+{
+  "name": "eloquence-game-ui",
+  "version": "1.0.0",
+  "description": "Game UI module for Eloquence.AI - Interactive frontend with Elo scoring and audience reactions",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "autoprefixer": "^10.4.16",
+    "framer-motion": "^10.16.4",
+    "lucide-react": "^0.292.0",
+    "next": "^14.0.0",
+    "postcss": "^8.4.31",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.5.2",
+    "recharts": "^2.8.0",
+    "socket.io-client": "^4.7.4",
+    "tailwindcss": "^3.3.0",
+    "uuid": "^9.0.1",
+    "zustand": "^4.4.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.38",
+    "@types/react-dom": "^18.2.17",
+    "@types/uuid": "^9.0.7",
+    "eslint": "^8.54.0",
+    "eslint-config-next": "^14.0.0",
+    "prettier": "^3.1.0",
+    "prettier-plugin-tailwindcss": "^0.5.7",
+    "typescript": "^5.3.2"
+  },
+  "keywords": [
+    "nextjs",
+    "react",
+    "public-speaking",
+    "elo-scoring",
+    "gamification",
+    "real-time-feedback"
+  ],
+  "author": "Eloquence.AI Team",
+  "license": "MIT"
+}
