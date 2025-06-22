@@ -1,0 +1,5 @@
+Session ID: 1750613214456
+Timestamp: 2025-06-22T17:27:01.689Z
+Transcript:
+Hello, my name is Brandon. This is a mediocre speech.
+

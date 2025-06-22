@@ -1,0 +1,5 @@
+Session ID: 1750612712735
+Timestamp: 2025-06-22T17:18:36.896Z
+Transcript:
+Hello, testing, testing.
+

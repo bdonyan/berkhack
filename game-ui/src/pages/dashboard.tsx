@@ -17,6 +17,7 @@ import { useGameStore } from '../stores/gameStore';
 import { useAuthStore } from '../stores/authStore';
 import { useMediaStream } from '@/hooks/useMediaStream';
 import toast from 'react-hot-toast';
+import { DailyMissions } from '@/components/DailyMissions';
 
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -49,6 +50,8 @@ export default function Dashboard() {
     setVisualFeedback,
     setAudienceReaction,
   } = useGameStore();
+
+  const { xp, streak } = useGameStore();
 
   const [voiceSocket, setVoiceSocket] = useState<Socket | null>(null);
   const [visionSocket, setVisionSocket] = useState<Socket | null>(null);
@@ -302,6 +305,24 @@ export default function Dashboard() {
           </div>
         </div>
       </header>
+
+      {/* XP and Streak Tracker */}
+      <div className="flex items-center space-x-6 mb-6 justify-center">
+        <div className="flex items-center">
+          <span className="font-bold text-lg text-yellow-600">{xp} XP</span>
+          <div className="ml-2 w-32 bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-yellow-400 h-2 rounded-full transition-all duration-500"
+              style={{ width: `${Math.min((xp % 100), 100)}%` }}
+            ></div>
+          </div>
+        </div>
+        <div className="flex items-center ml-6">
+          <span className="text-2xl mr-1">🔥</span>
+          <span className="font-bold">{streak} day streak</span>
+        </div>
+      </div>
+      <DailyMissions />
 
       <main className="container mx-auto px-4 py-8">
         {/* Welcome Section */}

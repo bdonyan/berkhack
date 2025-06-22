@@ -59,6 +59,11 @@ interface GameState {
   currentEloRating: number;
   sessionHistory: any[];
   
+  // XP and streak
+  xp: number;
+  streak: number;
+  lastSessionDate: string | null;
+  
   // Settings
   settings: {
     enableRealTimeFeedback: boolean;
@@ -91,6 +96,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   
   currentEloRating: 1200,
   sessionHistory: [],
+  
+  xp: 0,
+  streak: 0,
+  lastSessionDate: null,
   
   settings: {
     enableRealTimeFeedback: true,
@@ -151,12 +160,30 @@ export const useGameStore = create<GameState>((set, get) => ({
       const eloChange = Math.round(combinedScore - 50); // Convert 0-100 score to -50 to 50 change
       const newElo = currentElo + eloChange;
 
+      // XP and streak logic
+      const today = new Date().toDateString();
+      let xp = get().xp;
+      let streak = get().streak;
+      let lastSessionDate = get().lastSessionDate;
+      xp += 10; // +10 XP for completing a session
+      if (lastSessionDate !== today) {
+        if (lastSessionDate && (new Date(today).getTime() - new Date(lastSessionDate).getTime() > 86400000)) {
+          streak = 1; // Missed a day, reset streak
+        } else {
+          streak += 1;
+        }
+        lastSessionDate = today;
+      }
+
       set({
         isSessionActive: false,
         sessionId: null,
         sessionStartTime: null,
         sessionHistory: [...sessionHistory],
         currentEloRating: newElo,
+        xp,
+        streak,
+        lastSessionDate,
       });
     }
   },
