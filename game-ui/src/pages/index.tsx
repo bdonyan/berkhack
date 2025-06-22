@@ -164,6 +164,7 @@ export default function Home() {
       try {
         toast.loading('Analyzing your speech...');
         const audioBase64 = await blobToBase64(recordedBlob);
+        // Use environment variable or fallback to default port
         const voiceApiUrl = process.env.NEXT_PUBLIC_VOICE_API_URL || 'http://localhost:3001';
         const response = await fetch(`${voiceApiUrl}/analyze-speech`, {
           method: 'POST',
