@@ -1,0 +1,4 @@
+Session ID: 1750575018162
+Timestamp: 2025-06-22T06:50:53.340Z
+Transcript:
+This is a mock transcript for development purposes. The actual speech would be transcribed here.

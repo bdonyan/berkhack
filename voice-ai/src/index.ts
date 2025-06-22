@@ -98,9 +98,15 @@ app.post('/analyze-speech', async (req, res) => {
     });
 
     res.json(feedback);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Speech analysis error:', error);
-    res.status(500).json({ error: 'Speech analysis failed' });
+    if (error.status) { // This indicates an API error from OpenAI
+      return res.status(error.status).json({ 
+        error: `Failed to process speech. OpenAI API returned status ${error.status}.`,
+        details: error.message 
+      });
+    }
+    res.status(500).json({ error: 'An unexpected error occurred during speech analysis.' });
   }
 });
 

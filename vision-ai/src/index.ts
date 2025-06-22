@@ -50,33 +50,14 @@ app.post('/analyze-frame', async (req, res) => {
     }
 
     // Analyze facial expressions and body language
-    const analysis = await visionAnalyzer.analyzeFrame(imageData);
+    const feedback = await visionAnalyzer.analyzeFrame(imageData);
     
     // Recognize gestures
-    const gestures = await gestureRecognizer.recognizeGestures(imageData);
-    
-    // Combine analysis results
-    const feedback: VisualFeedback = {
-      timestamp: Date.now(),
-      eyeContact: analysis.eyeContact,
-      facialExpression: analysis.facialExpression,
-      posture: analysis.posture,
-      gestures: gestures,
-      bodyLanguage: analysis.bodyLanguage,
-      feedback: {
-        positive: [],
-        improvements: [],
-        suggestions: []
-      },
-      overallScore: this.calculateOverallScore(analysis, gestures)
-    };
+    const gestures = gestureRecognizer.detectGestures(imageData);
+    feedback.gestures.detected = gestures;
 
     // Send real-time feedback via WebSocket
-    wsManager.broadcastFeedback({
-      type: 'visual_feedback',
-      data: feedback,
-      timestamp: Date.now()
-    });
+    wsManager.broadcastVisualFeedback(feedback);
 
     res.json(feedback);
   } catch (error) {
@@ -96,30 +77,12 @@ app.post('/stream-video', async (req, res) => {
 
     // Process frame (only analyze key frames for performance)
     if (isKeyFrame) {
-      const analysis = await visionAnalyzer.analyzeFrame(frameData);
-      const gestures = await gestureRecognizer.recognizeGestures(frameData);
-      
-      const feedback: VisualFeedback = {
-        timestamp: Date.now(),
-        eyeContact: analysis.eyeContact,
-        facialExpression: analysis.facialExpression,
-        posture: analysis.posture,
-        gestures: gestures,
-        bodyLanguage: analysis.bodyLanguage,
-        feedback: {
-          positive: [],
-          improvements: [],
-          suggestions: []
-        },
-        overallScore: this.calculateOverallScore(analysis, gestures)
-      };
+      const feedback = await visionAnalyzer.analyzeFrame(frameData);
+      const gestures = gestureRecognizer.detectGestures(frameData);
+      feedback.gestures.detected = gestures;
 
       // Broadcast to connected clients
-      wsManager.broadcastFeedback({
-        type: 'visual_feedback',
-        data: feedback,
-        timestamp: Date.now()
-      });
+      wsManager.broadcastVisualFeedback(feedback);
 
       res.json({ success: true, feedback });
     } else {
@@ -131,70 +94,8 @@ app.post('/stream-video', async (req, res) => {
   }
 });
 
-// WebSocket connection handling
-io.on('connection', (socket) => {
-  console.log('Client connected to Vision AI:', socket.id);
-  
-  wsManager.addClient(socket);
-
-  socket.on('start-vision-session', (data) => {
-    console.log('Starting vision session:', data);
-    wsManager.startSession(socket.id, data);
-  });
-
-  socket.on('video-frame', async (data) => {
-    try {
-      if (data.isKeyFrame) {
-        const analysis = await visionAnalyzer.analyzeFrame(data.frameData);
-        const gestures = await gestureRecognizer.recognizeGestures(data.frameData);
-        
-        const feedback: VisualFeedback = {
-          timestamp: Date.now(),
-          eyeContact: analysis.eyeContact,
-          facialExpression: analysis.facialExpression,
-          posture: analysis.posture,
-          gestures: gestures,
-          bodyLanguage: analysis.bodyLanguage,
-          feedback: {
-            positive: [],
-            improvements: [],
-            suggestions: []
-          },
-          overallScore: this.calculateOverallScore(analysis, gestures)
-        };
-
-        socket.emit('vision-feedback', feedback);
-      }
-    } catch (error) {
-      console.error('WebSocket video processing error:', error);
-      socket.emit('error', { message: 'Video processing failed' });
-    }
-  });
-
-  socket.on('disconnect', () => {
-    console.log('Client disconnected from Vision AI:', socket.id);
-    wsManager.removeClient(socket.id);
-  });
-});
-
-// Calculate overall visual score
-function calculateOverallScore(analysis: any, gestures: any): number {
-  const weights = {
-    eyeContact: 0.25,
-    facialExpression: 0.20,
-    posture: 0.20,
-    gestures: 0.15,
-    bodyLanguage: 0.20
-  };
-
-  return Math.round(
-    analysis.eyeContact.score * weights.eyeContact +
-    analysis.facialExpression.score * weights.facialExpression +
-    analysis.posture.score * weights.posture +
-    gestures.score * weights.gestures +
-    analysis.bodyLanguage.overall * weights.bodyLanguage
-  );
-}
+// WebSocket connection logic is now managed by WebSocketManager
+// No need for a separate io.on('connection', ...) block here
 
 // Start server
 server.listen(PORT, () => {

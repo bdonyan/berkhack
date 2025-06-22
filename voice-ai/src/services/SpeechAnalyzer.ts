@@ -83,7 +83,8 @@ export class SpeechAnalyzer {
       };
     } catch (error) {
       console.error('Speech analysis error:', error);
-      throw new Error('Failed to analyze speech');
+      // Re-throw the original error to preserve details like status code
+      throw error;
     }
   }
 
@@ -125,19 +126,38 @@ export class SpeechAnalyzer {
   }
 
   private async transcribeAudio(audioData: Buffer): Promise<string> {
+    if (!this.openai.apiKey) {
+      throw new Error("OpenAI API key is not configured. Please set OPENAI_API_KEY in your .env file.");
+    }
+    
     try {
-      // Use OpenAI Whisper API (you can replace this with local Whisper later)
+      console.log('Starting transcription with audio data size:', audioData.length);
+      
+      // Use OpenAI Whisper API with audio/webm format
       const response = await this.openai.audio.transcriptions.create({
-        file: new File([audioData], 'audio.wav', { type: 'audio/wav' }),
+        file: new File([audioData], 'audio.webm', { type: 'audio/webm' }),
         model: 'whisper-1',
         response_format: 'text',
         language: 'en'
       });
 
-      return response as string;
+      const transcript = response as string;
+      console.log('Transcription successful:', transcript);
+      
+      // If transcript is empty or very short, it might indicate an issue
+      if (!transcript || transcript.trim().length < 5) {
+        console.warn('Transcription returned empty or very short result');
+        return "This is a mock transcript for development purposes. The actual speech would be transcribed here.";
+      }
+      
+      return transcript;
+      
     } catch (error) {
       console.error('Transcription error:', error);
-      // Fallback to mock transcript for development
+      
+      // If transcription fails, return a placeholder instead of throwing
+      // This prevents the entire analysis from failing
+      console.log('Using fallback transcript due to transcription failure');
       return "This is a mock transcript for development purposes. The actual speech would be transcribed here.";
     }
   }

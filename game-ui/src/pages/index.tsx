@@ -116,6 +116,7 @@ export default function Home() {
 
       try {
         const audioBase64 = await blobToBase64(recordedBlob);
+        
         const response = await fetch('http://localhost:3001/analyze-speech', {
           method: 'POST',
           headers: {
@@ -133,7 +134,9 @@ export default function Home() {
           toast.success('Transcript processed and saved!');
           setTranscriptReady(true);
         } else {
-          toast.error('Failed to process transcript.');
+          const errorData = await response.json();
+          const errorMessage = errorData.details || errorData.error || 'Failed to process transcript.';
+          toast.error(`Error: ${errorMessage}`);
         }
       } catch (error) {
         console.error("Failed to send audio for analysis", error);

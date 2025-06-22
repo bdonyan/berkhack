@@ -19,8 +19,11 @@ export const useMediaStream = () => {
       setIsMicOn(true);
       setIsVideoOn(true);
       
-      // Start recording
-      mediaRecorderRef.current = new MediaRecorder(mediaStream);
+      // Start recording with audio-only format for better transcription
+      const audioStream = new MediaStream(mediaStream.getAudioTracks());
+      mediaRecorderRef.current = new MediaRecorder(audioStream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
           recordedChunksRef.current.push(event.data);
@@ -38,7 +41,7 @@ export const useMediaStream = () => {
     return new Promise<Blob | null>((resolve) => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.onstop = () => {
-          const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+          const blob = new Blob(recordedChunksRef.current, { type: 'audio/webm' });
           recordedChunksRef.current = [];
           
           if (streamRef.current) {
