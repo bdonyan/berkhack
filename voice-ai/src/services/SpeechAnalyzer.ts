@@ -14,18 +14,23 @@ interface SpeechAnalysis {
     wordsPerMinute: number;
     pauses: number;
     score: number;
+    rhythm: string;
+    consistency: number;
   };
   fillerWords: {
     count: number;
     words: string[];
     score: number;
+    detailedAnalysis: any;
   };
   clarity: {
     pronunciation: number;
     volume: number;
     articulation: number;
     overall: number;
+    detailedAnalysis: any;
   };
+  detailedInsights: string[];
 }
 
 export class SpeechAnalyzer {
@@ -239,17 +244,27 @@ ${transcript}
     // Calculate words per minute (assuming 2 seconds of audio)
     const wordsPerMinute = (wordCount / 2) * 60;
     
-    // Detect filler words
+    // Detect filler words with detailed analysis
     const fillerWords = this.detectFillerWords(transcript);
     
     // Analyze tone using OpenAI
     const tone = await this.analyzeTone(transcript);
     
-    // Calculate pause count (simplified)
-    const pauses = this.countPauses(transcript);
+    // Calculate pause count and pacing metrics
+    const pacingMetrics = this.analyzePacing(transcript, wordsPerMinute);
     
     // Calculate clarity metrics
     const clarity = this.calculateClarity(transcript, words);
+    
+    // Get LLM-powered detailed analysis
+    const detailedAnalysis = await this.getDetailedAnalysis(transcript, {
+      wordCount,
+      wordsPerMinute,
+      fillerWords,
+      tone,
+      pacingMetrics,
+      clarity
+    });
     
     return {
       transcript,
@@ -257,11 +272,20 @@ ${transcript}
       tone,
       pace: {
         wordsPerMinute,
-        pauses,
-        score: this.scorePace(wordsPerMinute, pauses)
+        pauses: pacingMetrics.pauses,
+        score: pacingMetrics.score,
+        rhythm: pacingMetrics.rhythm,
+        consistency: pacingMetrics.consistency
       },
-      fillerWords,
-      clarity
+      fillerWords: {
+        ...fillerWords,
+        detailedAnalysis: detailedAnalysis.fillerWords
+      },
+      clarity: {
+        ...clarity,
+        detailedAnalysis: detailedAnalysis.clarity
+      },
+      detailedInsights: detailedAnalysis.insights
     };
   }
 
@@ -321,17 +345,33 @@ ${transcript}
     }
   }
 
-  private countPauses(transcript: string): number {
-    // Count periods, commas, and ellipses as potential pauses
+  private analyzePacing(transcript: string, wordsPerMinute: number): {
+    pauses: number;
+    score: number;
+    rhythm: string;
+    consistency: number;
+  } {
+    // Count pauses (periods, commas, ellipses)
     const pausePatterns = /[.,…]/g;
     const matches = transcript.match(pausePatterns);
-    return matches ? matches.length : 0;
-  }
-
-  private scorePace(wordsPerMinute: number, pauses: number): number {
-    // Ideal pace: 150-180 WPM
-    let score = 100;
+    const pauses = matches ? matches.length : 0;
     
+    // Analyze sentence length variation for rhythm
+    const sentences = transcript.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const sentenceLengths = sentences.map(s => s.split(/\s+/).length);
+    const avgSentenceLength = sentenceLengths.reduce((a, b) => a + b, 0) / sentenceLengths.length;
+    const lengthVariance = sentenceLengths.reduce((sum, len) => sum + Math.pow(len - avgSentenceLength, 2), 0) / sentenceLengths.length;
+    
+    // Determine rhythm based on sentence length variation
+    let rhythm = 'consistent';
+    if (lengthVariance > 10) rhythm = 'varied';
+    if (lengthVariance > 20) rhythm = 'unpredictable';
+    
+    // Calculate consistency score (lower variance = higher consistency)
+    const consistency = Math.max(0, 100 - (lengthVariance * 2));
+    
+    // Calculate overall pace score
+    let score = 100;
     if (wordsPerMinute < 120) score -= 20; // Too slow
     else if (wordsPerMinute > 200) score -= 20; // Too fast
     
@@ -339,7 +379,115 @@ ${transcript}
     if (pauses < 2) score -= 10; // Not enough pauses
     else if (pauses > 10) score -= 15; // Too many pauses
     
-    return Math.max(0, score);
+    return {
+      pauses,
+      score: Math.max(0, score),
+      rhythm,
+      consistency: Math.round(consistency)
+    };
+  }
+
+  private async getDetailedAnalysis(transcript: string, metrics: any): Promise<{
+    fillerWords: any;
+    clarity: any;
+    insights: string[];
+  }> {
+    try {
+      const prompt = `You are an expert public speaking coach analyzing a speech transcript. Provide detailed, actionable insights.
+
+TRANSCRIPT: "${transcript}"
+
+METRICS:
+- Word Count: ${metrics.wordCount}
+- Words Per Minute: ${metrics.wordsPerMinute}
+- Filler Words: ${metrics.fillerWords.count} (${metrics.fillerWords.words.join(', ')})
+- Tone: ${metrics.tone.emotion} (${metrics.tone.score}/100)
+- Pacing: ${metrics.pacingMetrics.rhythm} rhythm, ${metrics.pacingMetrics.consistency}/100 consistency
+- Clarity: ${metrics.clarity.overall}/100
+
+Provide detailed analysis in JSON format:
+{
+  "fillerWords": {
+    "analysis": "Detailed analysis of filler word usage",
+    "impact": "How filler words affect the speech",
+    "specificWords": ["list of specific filler words found"],
+    "recommendations": ["specific ways to reduce each filler word"]
+  },
+  "clarity": {
+    "strengths": ["what makes the speech clear"],
+    "weaknesses": ["what makes it unclear"],
+    "articulation": "analysis of pronunciation and articulation",
+    "vocabulary": "analysis of word choice and complexity"
+  },
+  "insights": [
+    "3-5 key insights about the speech",
+    "specific observations about delivery",
+    "actionable improvement suggestions"
+  ]
+}
+
+Be specific, constructive, and actionable. Focus on concrete examples from the transcript.`;
+
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert public speaking coach. Provide detailed, actionable analysis in JSON format.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.3
+      });
+
+      const content = response.choices[0].message.content;
+      if (content) {
+        try {
+          return JSON.parse(content);
+        } catch (parseError) {
+          console.error('Failed to parse detailed analysis:', parseError);
+          return this.getDefaultDetailedAnalysis(transcript, metrics);
+        }
+      }
+
+      return this.getDefaultDetailedAnalysis(transcript, metrics);
+    } catch (error) {
+      console.error('Detailed analysis error:', error);
+      return this.getDefaultDetailedAnalysis(transcript, metrics);
+    }
+  }
+
+  private getDefaultDetailedAnalysis(transcript: string, metrics: any): {
+    fillerWords: any;
+    clarity: any;
+    insights: string[];
+  } {
+    return {
+      fillerWords: {
+        analysis: `Found ${metrics.fillerWords.count} filler words in your speech.`,
+        impact: "Filler words can make you sound less confident and professional.",
+        specificWords: metrics.fillerWords.words,
+        recommendations: [
+          "Practice pausing instead of using 'um' or 'uh'",
+          "Record yourself and identify filler word patterns",
+          "Use breathing techniques to create natural pauses"
+        ]
+      },
+      clarity: {
+        strengths: ["Good effort in communicating your message"],
+        weaknesses: ["Could benefit from clearer articulation"],
+        articulation: "Focus on pronouncing each word clearly",
+        vocabulary: "Consider using more varied and precise language"
+      },
+      insights: [
+        `Your speaking pace of ${metrics.wordsPerMinute} WPM is ${metrics.wordsPerMinute < 150 ? 'good' : 'could be slower'}`,
+        `Your ${metrics.tone.emotion} tone shows ${metrics.tone.score > 70 ? 'good' : 'room for improvement in'} confidence`,
+        "Practice regularly to improve overall speech quality"
+      ]
+    };
   }
 
   private calculateClarity(transcript: string, words: string[]): {

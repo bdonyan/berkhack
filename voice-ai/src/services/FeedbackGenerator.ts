@@ -45,22 +45,36 @@ export class FeedbackGenerator {
 Speech Analysis:
 - Transcript: "${analysis.transcript}"
 - Tone: ${analysis.tone?.emotion} (score: ${analysis.tone?.score}/100)
-- Pace: ${analysis.pace?.wordsPerMinute} WPM (score: ${analysis.pace?.score}/100)
-- Filler Words: ${analysis.fillerWords?.count} detected (score: ${analysis.fillerWords?.score}/100)
-- Clarity: ${analysis.clarity?.overall}/100
+- Pace: ${analysis.pace?.wordsPerMinute} WPM, ${analysis.pace?.rhythm} rhythm, ${analysis.pace?.consistency}/100 consistency (score: ${analysis.pace?.score}/100)
+- Filler Words: ${analysis.fillerWords?.count} detected (${analysis.fillerWords?.words.join(', ')}) (score: ${analysis.fillerWords?.score}/100)
+- Clarity: ${analysis.clarity?.overall}/100 (pronunciation: ${analysis.clarity?.pronunciation}, articulation: ${analysis.clarity?.articulation})
+
+${analysis.fillerWords?.detailedAnalysis ? `
+Filler Word Analysis: ${analysis.fillerWords.detailedAnalysis.analysis}
+Impact: ${analysis.fillerWords.detailedAnalysis.impact}
+` : ''}
+
+${analysis.clarity?.detailedAnalysis ? `
+Clarity Strengths: ${analysis.clarity.detailedAnalysis.strengths.join(', ')}
+Clarity Weaknesses: ${analysis.clarity.detailedAnalysis.weaknesses.join(', ')}
+` : ''}
+
+${analysis.detailedInsights ? `
+Key Insights: ${analysis.detailedInsights.join('; ')}
+` : ''}
 
 Generate constructive feedback in JSON format:
 {
-  "positive": ["2-3 specific things they did well"],
-  "improvements": ["2-3 specific areas to improve"],
-  "suggestions": ["2-3 actionable suggestions for next time"]
+  "positive": ["2-3 specific things they did well, based on the detailed analysis"],
+  "improvements": ["2-3 specific areas to improve, with concrete examples"],
+  "suggestions": ["2-3 actionable suggestions for next time, incorporating the detailed insights"]
 }
 
-Be encouraging but honest. Focus on specific, actionable advice.`;
+Be encouraging but honest. Focus on specific, actionable advice based on the detailed analysis provided.`;
 
       const response = await this.anthropic.messages.create({
         model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 500,
+        max_tokens: 600,
         temperature: 0.7,
         messages: [
           {
@@ -92,7 +106,11 @@ Be encouraging but honest. Focus on specific, actionable advice.`;
     improvements: string[];
     suggestions: string[];
   } {
-    const feedback = {
+    const feedback: {
+      positive: string[];
+      improvements: string[];
+      suggestions: string[];
+    } = {
       positive: [],
       improvements: [],
       suggestions: []

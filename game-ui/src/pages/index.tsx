@@ -9,6 +9,7 @@ import { FeedbackPanel } from '@/components/FeedbackPanel';
 import { PerformanceMetrics } from '@/components/PerformanceMetrics';
 import { SessionControls } from '@/components/SessionControls';
 import { TranscriptViewer } from '@/components/TranscriptViewer';
+import { DetailedAnalysis } from '@/components/DetailedAnalysis';
 import { useGameStore } from '../stores/gameStore';
 import { useMediaStream } from '@/hooks/useMediaStream';
 import toast from 'react-hot-toast';
@@ -247,6 +248,9 @@ export default function Home() {
               eloRating={currentEloRating}
               sessionHistory={sessionHistory}
             />
+
+            {/* Detailed Analysis */}
+            <DetailedAnalysis speechFeedback={speechFeedback} />
 
             {/* Transcript Viewer */}
             <TranscriptViewer 

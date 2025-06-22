@@ -13,23 +13,38 @@ export interface SpeechFeedback {
     wordsPerMinute: number;
     pauses: number; // count of pauses
     score: number; // 0-100
+    rhythm: string; // 'consistent' | 'varied' | 'unpredictable'
+    consistency: number; // 0-100
   };
   fillerWords: {
     count: number;
     words: string[]; // e.g., ["um", "uh", "like", "you know"]
     score: number; // 0-100
+    detailedAnalysis?: {
+      analysis: string;
+      impact: string;
+      specificWords: string[];
+      recommendations: string[];
+    };
   };
   clarity: {
     pronunciation: number; // 0-100
     volume: number; // 0-100
     articulation: number; // 0-100
     overall: number; // 0-100
+    detailedAnalysis?: {
+      strengths: string[];
+      weaknesses: string[];
+      articulation: string;
+      vocabulary: string;
+    };
   };
   feedback: {
     positive: string[];
     improvements: string[];
     suggestions: string[];
   };
+  detailedInsights?: string[]; // LLM-generated insights
   overallScore: number; // 0-100
 }
 
