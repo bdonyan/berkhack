@@ -164,6 +164,7 @@ export default function Home() {
       try {
         toast.loading('Analyzing your speech...');
         const audioBase64 = await blobToBase64(recordedBlob);
+        
         // Use environment variable or fallback to default port
         const voiceApiUrl = process.env.NEXT_PUBLIC_VOICE_API_URL || 'http://localhost:3001';
         const response = await fetch(`${voiceApiUrl}/analyze-speech`, {
@@ -183,7 +184,10 @@ export default function Home() {
           setSpeechFeedback(feedback);
           toast.success('Transcript processed and saved!');
           setTranscriptReady(true);
+          // Set mock visual feedback for testing
           setVisualFeedback(VisualDataGenerator.generateVisualFeedback());
+          
+          // Show analysis dashboard after processing is complete
           setTimeout(() => {
             setShowAnalysisDashboard(true);
           }, 1000);
@@ -191,8 +195,11 @@ export default function Home() {
           const errorData = await response.json();
           const errorMessage = errorData.details || errorData.error || 'Failed to process transcript.';
           toast.error(`Error: ${errorMessage}`);
+          // Set mock data even if speech analysis fails
           setSpeechFeedback(VisualDataGenerator.generateSpeechFeedback());
           setVisualFeedback(VisualDataGenerator.generateVisualFeedback());
+          
+          // Show dashboard even if there's an error, with available data
           setTimeout(() => {
             setShowAnalysisDashboard(true);
           }, 1000);
@@ -201,8 +208,11 @@ export default function Home() {
         toast.dismiss();
         console.error("Failed to send audio for analysis", error);
         toast.error('Failed to send audio for analysis.');
+        // Set mock data even if there's an error
         setSpeechFeedback(VisualDataGenerator.generateSpeechFeedback());
         setVisualFeedback(VisualDataGenerator.generateVisualFeedback());
+        
+        // Show dashboard even if there's an error, with available data
         setTimeout(() => {
           setShowAnalysisDashboard(true);
         }, 1000);
@@ -211,8 +221,11 @@ export default function Home() {
         setIsEnding(false);
       }
     } else {
+      // Set mock data even if no recording was made
       setSpeechFeedback(VisualDataGenerator.generateSpeechFeedback());
       setVisualFeedback(VisualDataGenerator.generateVisualFeedback());
+      
+      // Show dashboard even if no recording was made
       setTimeout(() => {
         setShowAnalysisDashboard(true);
       }, 1000);
