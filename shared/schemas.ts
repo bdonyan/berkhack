@@ -28,15 +28,13 @@ export interface SpeechFeedback {
     };
   };
   clarity: {
-    pronunciation: number; // 0-100
-    volume: number; // 0-100
-    articulation: number; // 0-100
-    overall: number; // 0-100
+    articulation: number; // Heuristic based on vocabulary
+    overall: number; // Heuristic-based score
     detailedAnalysis?: {
+      score: number;
       strengths: string[];
       weaknesses: string[];
-      articulation: string;
-      vocabulary: string;
+      recommendations: string[];
     };
   };
   feedback: {

@@ -71,7 +71,7 @@ app.get('/transcripts', async (req, res) => {
 // Speech analysis endpoint
 app.post('/analyze-speech', async (req, res) => {
   try {
-    const { audioData, sessionId } = req.body;
+    const { audioData, sessionId, duration } = req.body;
     
     if (!audioData) {
       return res.status(400).json({ error: 'Audio data is required' });
@@ -85,7 +85,7 @@ app.post('/analyze-speech', async (req, res) => {
     const audioBuffer = Buffer.from(base64String, 'base64');
 
     // Analyze speech
-    const analysis = await speechAnalyzer.analyzeAudio(audioBuffer, sessionId);
+    const analysis = await speechAnalyzer.analyzeAudio(audioBuffer, sessionId, duration);
     
     // Generate feedback
     const feedback = await feedbackGenerator.generateFeedback(analysis);

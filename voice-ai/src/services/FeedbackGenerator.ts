@@ -40,48 +40,32 @@ export class FeedbackGenerator {
     suggestions: string[];
   }> {
     try {
-      const prompt = `You are an empathetic public speaking coach analyzing a speech. 
-      
+      const prompt = `You are an empathetic public speaking coach. Analyze the provided speech analysis and generate constructive feedback.
+
 Speech Analysis:
 - Transcript: "${analysis.transcript}"
 - Tone: ${analysis.tone?.emotion} (score: ${analysis.tone?.score}/100)
-- Pace: ${analysis.pace?.wordsPerMinute} WPM, ${analysis.pace?.rhythm} rhythm, ${analysis.pace?.consistency}/100 consistency (score: ${analysis.pace?.score}/100)
-- Filler Words: ${analysis.fillerWords?.count} detected (${analysis.fillerWords?.words.join(', ')}) (score: ${analysis.fillerWords?.score}/100)
-- Clarity: ${analysis.clarity?.overall}/100 (pronunciation: ${analysis.clarity?.pronunciation}, articulation: ${analysis.clarity?.articulation})
+- Pace: ${analysis.pace?.wordsPerMinute} WPM, ${analysis.pace?.rhythm} rhythm (score: ${analysis.pace?.score}/100)
+- Filler Words: ${analysis.fillerWords?.count} detected (score: ${analysis.fillerWords?.score}/100)
+- Clarity: ${analysis.clarity?.overall}/100
 
-${analysis.fillerWords?.detailedAnalysis ? `
-Filler Word Analysis: ${analysis.fillerWords.detailedAnalysis.analysis}
-Impact: ${analysis.fillerWords.detailedAnalysis.impact}
-` : ''}
-
-${analysis.clarity?.detailedAnalysis ? `
-Clarity Strengths: ${analysis.clarity.detailedAnalysis.strengths.join(', ')}
-Clarity Weaknesses: ${analysis.clarity.detailedAnalysis.weaknesses.join(', ')}
-` : ''}
-
-${analysis.detailedInsights ? `
-Key Insights: ${analysis.detailedInsights.join('; ')}
-` : ''}
-
-Generate constructive feedback in JSON format:
+You MUST respond with only a valid JSON object in the following format. Do not include any other text, explanation, or markdown formatting.
 {
-  "positive": ["2-3 specific things they did well, based on the detailed analysis"],
+  "positive": ["2-3 specific things they did well, based on the analysis"],
   "improvements": ["2-3 specific areas to improve, with concrete examples"],
-  "suggestions": ["2-3 actionable suggestions for next time, incorporating the detailed insights"]
-}
-
-Be encouraging but honest. Focus on specific, actionable advice based on the detailed analysis provided.`;
+  "suggestions": ["2-3 actionable suggestions for next time"]
+}`;
 
       const response = await this.anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-3-5-sonnet-20240620',
         max_tokens: 600,
         temperature: 0.7,
         messages: [
           {
             role: 'user',
-            content: prompt
-          }
-        ]
+            content: prompt,
+          },
+        ],
       });
 
       const content = response.content[0];

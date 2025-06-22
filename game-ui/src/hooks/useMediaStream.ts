@@ -7,6 +7,7 @@ export const useMediaStream = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingStartRef = useRef<number | null>(null);
 
   const startStream = useCallback(async () => {
     try {
@@ -30,6 +31,7 @@ export const useMediaStream = () => {
         }
       };
       mediaRecorderRef.current.start();
+      recordingStartRef.current = Date.now();
 
     } catch (err) {
       console.error("Error accessing media devices.", err);
@@ -38,11 +40,12 @@ export const useMediaStream = () => {
   }, []);
 
   const stopStream = useCallback(() => {
-    return new Promise<Blob | null>((resolve) => {
+    return new Promise<{blob: Blob, duration: number} | null>((resolve) => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.onstop = () => {
           const blob = new Blob(recordedChunksRef.current, { type: 'audio/webm' });
           recordedChunksRef.current = [];
+          const durationInSeconds = recordingStartRef.current ? (Date.now() - recordingStartRef.current) / 1000 : 0;
           
           if (streamRef.current) {
             streamRef.current.getTracks().forEach(track => track.stop());
@@ -50,7 +53,7 @@ export const useMediaStream = () => {
             streamRef.current = null;
           }
           
-          resolve(blob);
+          resolve({ blob, duration: durationInSeconds });
         };
         mediaRecorderRef.current.stop();
       } else {

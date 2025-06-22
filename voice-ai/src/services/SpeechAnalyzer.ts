@@ -24,13 +24,41 @@ interface SpeechAnalysis {
     detailedAnalysis: any;
   };
   clarity: {
-    pronunciation: number;
-    volume: number;
     articulation: number;
     overall: number;
-    detailedAnalysis: any;
+    detailedAnalysis?: {
+      score: number;
+      strengths: string[];
+      weaknesses: string[];
+      recommendations: string[];
+    };
   };
   detailedInsights: string[];
+}
+
+function parseJsonFromMarkdown(markdownString: string): any {
+  // First, try to find a JSON block within markdown
+  const jsonRegex = /```json\n([\s\S]*?)\n```/;
+  const match = markdownString.match(jsonRegex);
+  
+  if (match && match[1]) {
+    try {
+      // If a markdown block is found, parse its content
+      return JSON.parse(match[1]);
+    } catch (e) {
+      console.error("Failed to parse extracted JSON from markdown:", e);
+      return null; // Don't proceed if parsing the extracted part fails
+    }
+  } else {
+    // If no markdown block is found, assume the whole string might be a JSON object
+    try {
+      return JSON.parse(markdownString);
+    } catch (e) {
+      // The string is not a valid JSON object
+      console.error("String is not a valid JSON object:", e);
+      return null;
+    }
+  }
 }
 
 export class SpeechAnalyzer {
@@ -55,7 +83,7 @@ export class SpeechAnalyzer {
     }
   }
 
-  async analyzeAudio(audioData: Buffer, sessionId?: string): Promise<SpeechFeedback> {
+  async analyzeAudio(audioData: Buffer, sessionId?: string, duration?: number): Promise<SpeechFeedback> {
     try {
       // Transcribe audio using OpenAI Whisper
       const transcript = await this.transcribeAudio(audioData);
@@ -66,7 +94,7 @@ export class SpeechAnalyzer {
       }
       
       // Analyze speech characteristics
-      const analysis = await this.analyzeSpeechCharacteristics(transcript);
+      const analysis = await this.analyzeSpeechCharacteristics(transcript, duration);
       
       // Calculate overall score
       const overallScore = this.calculateOverallScore(analysis);
@@ -237,12 +265,12 @@ ${transcript}
     }
   }
 
-  private async analyzeSpeechCharacteristics(transcript: string): Promise<SpeechAnalysis> {
+  private async analyzeSpeechCharacteristics(transcript: string, duration?: number): Promise<SpeechAnalysis> {
     const words = transcript.split(/\s+/).filter(word => word.length > 0);
     const wordCount = words.length;
     
-    // Calculate words per minute (assuming 2 seconds of audio)
-    const wordsPerMinute = (wordCount / 2) * 60;
+    // Calculate words per minute (WPM)
+    const wordsPerMinute = (duration && duration > 1) ? Math.round((wordCount / duration) * 60) : 0;
     
     // Detect filler words with detailed analysis
     const fillerWords = this.detectFillerWords(transcript);
@@ -282,7 +310,8 @@ ${transcript}
         detailedAnalysis: detailedAnalysis.fillerWords
       },
       clarity: {
-        ...clarity,
+        articulation: clarity.articulation,
+        overall: clarity.overall,
         detailedAnalysis: detailedAnalysis.clarity
       },
       detailedInsights: detailedAnalysis.insights
@@ -316,7 +345,7 @@ ${transcript}
         messages: [
           {
             role: 'system',
-            content: 'Analyze the emotional tone of this speech. Return only a JSON object with "emotion" (one of: confident, nervous, enthusiastic, monotone, engaging) and "score" (0-100).'
+            content: 'Analyze the emotional tone of this speech. You MUST respond with only a valid JSON object with an "emotion" key (one of: confident, nervous, enthusiastic, monotone, engaging) and a "score" key (0-100). Do not include any other text, explanation, or markdown formatting.'
           },
           {
             role: 'user',
@@ -326,7 +355,10 @@ ${transcript}
         temperature: 0.3
       });
 
-      const result = JSON.parse(response.choices[0].message.content || '{}');
+      const result = parseJsonFromMarkdown(response.choices[0].message.content || '{}');
+      if (!result) {
+        return { emotion: 'confident', score: 50 };
+      }
       const emotion = result.emotion || 'confident';
       
       // Ensure the emotion is one of the allowed values
@@ -393,7 +425,7 @@ ${transcript}
     insights: string[];
   }> {
     try {
-      const prompt = `You are an expert public speaking coach analyzing a speech transcript. Provide detailed, actionable insights.
+      const prompt = `You are an expert public speaking coach. Analyze the provided speech transcript and metrics.
 
 TRANSCRIPT: "${transcript}"
 
@@ -403,9 +435,9 @@ METRICS:
 - Filler Words: ${metrics.fillerWords.count} (${metrics.fillerWords.words.join(', ')})
 - Tone: ${metrics.tone.emotion} (${metrics.tone.score}/100)
 - Pacing: ${metrics.pacingMetrics.rhythm} rhythm, ${metrics.pacingMetrics.consistency}/100 consistency
-- Clarity: ${metrics.clarity.overall}/100
+- Clarity Score (Heuristic): ${metrics.clarity.overall}/100
 
-Provide detailed analysis in JSON format:
+You MUST respond with only a valid JSON object in the following format. Do not include any other text, explanation, or markdown formatting.
 {
   "fillerWords": {
     "analysis": "Detailed analysis of filler word usage",
@@ -414,26 +446,24 @@ Provide detailed analysis in JSON format:
     "recommendations": ["specific ways to reduce each filler word"]
   },
   "clarity": {
+    "score": "A score from 0-100 indicating the overall clarity of the speech, considering structure, conciseness, and word choice.",
     "strengths": ["what makes the speech clear"],
     "weaknesses": ["what makes it unclear"],
-    "articulation": "analysis of pronunciation and articulation",
-    "vocabulary": "analysis of word choice and complexity"
+    "recommendations": ["actionable advice to improve clarity"]
   },
   "insights": [
     "3-5 key insights about the speech",
     "specific observations about delivery",
     "actionable improvement suggestions"
   ]
-}
-
-Be specific, constructive, and actionable. Focus on concrete examples from the transcript.`;
+}`;
 
       const response = await this.openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
           {
             role: 'system',
-            content: 'You are an expert public speaking coach. Provide detailed, actionable analysis in JSON format.'
+            content: 'You are an expert public speaking coach. You MUST respond with only a valid JSON object and no other text.'
           },
           {
             role: 'user',
@@ -446,7 +476,12 @@ Be specific, constructive, and actionable. Focus on concrete examples from the t
       const content = response.choices[0].message.content;
       if (content) {
         try {
-          return JSON.parse(content);
+          const parsedContent = parseJsonFromMarkdown(content);
+          if (parsedContent) {
+            return parsedContent;
+          }
+          console.error('Failed to parse detailed analysis: parsedContent is null');
+          return this.getDefaultDetailedAnalysis(transcript, metrics);
         } catch (parseError) {
           console.error('Failed to parse detailed analysis:', parseError);
           return this.getDefaultDetailedAnalysis(transcript, metrics);
@@ -477,13 +512,13 @@ Be specific, constructive, and actionable. Focus on concrete examples from the t
         ]
       },
       clarity: {
-        strengths: ["Good effort in communicating your message"],
-        weaknesses: ["Could benefit from clearer articulation"],
-        articulation: "Focus on pronouncing each word clearly",
-        vocabulary: "Consider using more varied and precise language"
+        score: "A score from 0-100 indicating the overall clarity of the speech, considering structure, conciseness, and word choice.",
+        strengths: ["what makes the speech clear"],
+        weaknesses: ["what makes it unclear"],
+        recommendations: ["actionable advice to improve clarity"]
       },
       insights: [
-        `Your speaking pace of ${metrics.wordsPerMinute} WPM is ${metrics.wordsPerMinute < 150 ? 'good' : 'could be slower'}`,
+        "Your speaking pace of ${metrics.wordsPerMinute} WPM is ${metrics.wordsPerMinute > 0 ? (metrics.wordsPerMinute < 150 ? 'good' : 'could be slower') : 'not available'}",
         `Your ${metrics.tone.emotion} tone shows ${metrics.tone.score > 70 ? 'good' : 'room for improvement in'} confidence`,
         "Practice regularly to improve overall speech quality"
       ]
@@ -491,25 +526,18 @@ Be specific, constructive, and actionable. Focus on concrete examples from the t
   }
 
   private calculateClarity(transcript: string, words: string[]): {
-    pronunciation: number;
-    volume: number;
     articulation: number;
     overall: number;
   } {
-    // Simplified clarity calculation
-    const wordLength = words.reduce((sum, word) => sum + word.length, 0) / words.length;
+    // This is a simplified, heuristic-based calculation.
+    // The more meaningful analysis comes from the LLM in `getDetailedAnalysis`.
     const uniqueWords = new Set(words).size;
-    const vocabularyScore = (uniqueWords / words.length) * 100;
+    const vocabularyScore = (words.length > 0) ? (uniqueWords / words.length) * 100 : 0;
     
-    const pronunciation = 85; // Placeholder - would need audio analysis
-    const volume = 80; // Placeholder - would need audio analysis
-    const articulation = Math.min(100, vocabularyScore + 20);
-    
-    const overall = (pronunciation + volume + articulation) / 3;
+    const articulation = Math.min(100, vocabularyScore + 20); // Placeholder
+    const overall = articulation; // Base score on articulation heuristic
     
     return {
-      pronunciation,
-      volume,
       articulation,
       overall
     };
