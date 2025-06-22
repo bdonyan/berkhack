@@ -49,6 +49,7 @@ export default function Home() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string>('');
   const [transcriptReady, setTranscriptReady] = useState(false);
+  const [isEnding, setIsEnding] = useState(false);
 
   const eloSystem = new EloScoringSystem();
 
@@ -90,6 +91,9 @@ export default function Home() {
   };
 
   const endSession = async () => {
+    if (isEnding) return;
+    setIsEnding(true);
+
     terminateConnections();
     const recordingResult = await stopStream();
 
@@ -149,9 +153,11 @@ export default function Home() {
         toast.error('Failed to send audio for analysis.');
       } finally {
         endSessionState();
+        setIsEnding(false);
       }
     } else {
       endSessionState();
+      setIsEnding(false);
     }
   };
 
@@ -234,6 +240,7 @@ export default function Home() {
               onToggleVideo={toggleVideo}
               isMicActive={isMicOn}
               isVideoActive={isVideoOn}
+              isEnding={isEnding}
             />
 
             {/* Audience Simulator */}

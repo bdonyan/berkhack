@@ -148,7 +148,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentSession.combinedScore = combinedScore;
 
       const currentElo = get().currentEloRating;
-      const newElo = eloSystem.updateRating(currentElo, combinedScore, 1200); // 1200 is avg opponent
+      const eloChange = Math.round(combinedScore - 50); // Convert 0-100 score to -50 to 50 change
+      const newElo = currentElo + eloChange;
 
       set({
         isSessionActive: false,
