@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { io, Socket } from 'socket.io-client';
 import { motion } from 'framer-motion';
-import { Mic, Video, Trophy, BarChart3, Users, Settings, Download } from 'lucide-react';
+import { Mic, Video, Trophy, BarChart3, Users, Settings, Download, Database } from 'lucide-react';
 import { EloScoringSystem } from '../utils/EloScoringSystem';
+import { VisualDataGenerator } from '../utils/VisualDataGenerator';
 import { AudienceSimulator } from '@/components/AudienceSimulator';
 import { FeedbackPanel } from '@/components/FeedbackPanel';
 import PerformanceMetrics from '@/components/PerformanceMetrics';
@@ -53,100 +54,7 @@ export default function Home() {
   const [showAnalysisDashboard, setShowAnalysisDashboard] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState<number>(0);
   const [isEnding, setIsEnding] = useState(false);
-
-  // Mock data for testing dashboard
-  const mockVisualFeedback = {
-    timestamp: Date.now(),
-    eyeContact: {
-      percentage: 85,
-      duration: 3.2,
-      score: 92
-    },
-    facialExpression: {
-      emotion: 'confident' as const,
-      confidence: 0.87,
-      score: 88
-    },
-    posture: {
-      stance: 'good' as const,
-      score: 95
-    },
-    gestures: {
-      detected: ['open palms', 'pointing'],
-      appropriateness: 90,
-      frequency: 12,
-      score: 85
-    },
-    bodyLanguage: {
-      openness: 88,
-      energy: 92,
-      engagement: 85,
-      overall: 88
-    },
-    feedback: {
-      positive: [
-        'Excellent eye contact maintained throughout the presentation',
-        'Confident facial expressions enhanced your message',
-        'Good use of hand gestures to emphasize key points'
-      ],
-      improvements: [
-        'Try to vary your hand gestures more naturally',
-        'Consider maintaining eye contact with different audience members'
-      ],
-      suggestions: [
-        'Practice using more open palm gestures',
-        'Work on transitioning between different facial expressions smoothly'
-      ]
-    },
-    overallScore: 88
-  };
-
-  // Mock speech feedback data
-  const mockSpeechFeedback = {
-    timestamp: Date.now(),
-    transcript: "Hello everyone, today I'm going to talk about the importance of effective communication in the workplace. Good communication is essential for building strong relationships and achieving our goals.",
-    confidence: 0.85,
-    tone: {
-      emotion: 'confident' as const,
-      score: 50
-    },
-    pace: {
-      wordsPerMinute: 450,
-      pauses: 2,
-      score: 80,
-      rhythm: 'consistent',
-      consistency: 85
-    },
-    fillerWords: {
-      count: 3,
-      words: ['um', 'uh', 'like'],
-      score: 75
-    },
-    clarity: {
-      pronunciation: 85,
-      volume: 80,
-      articulation: 100,
-      overall: 88.33
-    },
-    feedback: {
-      positive: [
-        'Clear and articulate speech throughout the presentation',
-        'Good pacing with natural rhythm and flow',
-        'Confident tone that engaged the audience'
-      ],
-      improvements: [
-        'Reduce filler words like "um" and "uh"',
-        'Vary your speaking pace to emphasize key points',
-        'Consider using more vocal inflection'
-      ],
-      suggestions: [
-        'Practice breathing exercises to improve pacing',
-        'Record yourself speaking to identify filler words',
-        'Use pauses strategically to emphasize important points'
-      ]
-    },
-    overallScore: 75
-  };
+  const [visualSkillPrediction, setVisualSkillPrediction] = useState<{ predicted: string; confidence: number } | null>(null);
 
   const eloSystem = new EloScoringSystem();
 
@@ -179,6 +87,13 @@ export default function Home() {
       }, 500);
     }
   }, [showAnalysisDashboard]);
+
+  // Whenever visualFeedback changes, update the prediction
+  useEffect(() => {
+    if (visualFeedback) {
+      setVisualSkillPrediction(VisualDataGenerator.getVisualSkillPrediction(visualFeedback));
+    }
+  }, [visualFeedback]);
 
   const handleStartNewSession = () => {
     setShowAnalysisDashboard(false);
@@ -249,7 +164,9 @@ export default function Home() {
       try {
         toast.loading('Analyzing your speech...');
         const audioBase64 = await blobToBase64(recordedBlob);
-        const response = await fetch('http://localhost:3001/analyze-speech', {
+        // Use environment variable or fallback to default port
+        const voiceApiUrl = process.env.NEXT_PUBLIC_VOICE_API_URL || 'http://localhost:3001';
+        const response = await fetch(`${voiceApiUrl}/analyze-speech`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -266,7 +183,9 @@ export default function Home() {
           setSpeechFeedback(feedback);
           toast.success('Transcript processed and saved!');
           setTranscriptReady(true);
-          setVisualFeedback(mockVisualFeedback);
+          // Set mock visual feedback for testing
+          setVisualFeedback(VisualDataGenerator.generateVisualFeedback());
+          // Show analysis dashboard after processing is complete
           setTimeout(() => {
             setShowAnalysisDashboard(true);
           }, 1000);
@@ -274,8 +193,10 @@ export default function Home() {
           const errorData = await response.json();
           const errorMessage = errorData.details || errorData.error || 'Failed to process transcript.';
           toast.error(`Error: ${errorMessage}`);
-          setSpeechFeedback(mockSpeechFeedback);
-          setVisualFeedback(mockVisualFeedback);
+          // Set mock data even if speech analysis fails
+          setSpeechFeedback(VisualDataGenerator.generateSpeechFeedback());
+          setVisualFeedback(VisualDataGenerator.generateVisualFeedback());
+          // Show dashboard even if there's an error, with available data
           setTimeout(() => {
             setShowAnalysisDashboard(true);
           }, 1000);
@@ -284,8 +205,10 @@ export default function Home() {
         toast.dismiss();
         console.error("Failed to send audio for analysis", error);
         toast.error('Failed to send audio for analysis.');
-        setSpeechFeedback(mockSpeechFeedback);
-        setVisualFeedback(mockVisualFeedback);
+        // Set mock data even if there's an error
+        setSpeechFeedback(VisualDataGenerator.generateSpeechFeedback());
+        setVisualFeedback(VisualDataGenerator.generateVisualFeedback());
+        // Show dashboard even if there's an error, with available data
         setTimeout(() => {
           setShowAnalysisDashboard(true);
         }, 1000);
@@ -294,10 +217,10 @@ export default function Home() {
         setIsEnding(false);
       }
     } else {
-      endSessionState();
-      setIsEnding(false);
-      setSpeechFeedback(mockSpeechFeedback);
-      setVisualFeedback(mockVisualFeedback);
+      // Set mock data even if no recording was made
+      setSpeechFeedback(VisualDataGenerator.generateSpeechFeedback());
+      setVisualFeedback(VisualDataGenerator.generateVisualFeedback());
+      // Show dashboard even if no recording was made
       setTimeout(() => {
         setShowAnalysisDashboard(true);
       }, 1000);
@@ -390,8 +313,8 @@ export default function Home() {
             <div className="text-center mt-4">
               <button
                 onClick={() => {
-                  setSpeechFeedback(mockSpeechFeedback);
-                  setVisualFeedback(mockVisualFeedback);
+                  setSpeechFeedback(VisualDataGenerator.generateSpeechFeedback());
+                  setVisualFeedback(VisualDataGenerator.generateVisualFeedback());
                   setShowAnalysisDashboard(true);
                 }}
                 className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600"
@@ -502,6 +425,8 @@ export default function Home() {
         overallScore={overallScore}
         sessionDuration={sessionDuration}
         onStartNewSession={handleStartNewSession}
+        onClose={() => setShowAnalysisDashboard(false)}
+        visualSkillPrediction={visualSkillPrediction}
       />
     </div>
   );
