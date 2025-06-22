@@ -126,21 +126,4 @@ Game UI → Elo Score → Performance History
 - Performance scoring metrics
 - Elo ranking data structure
 
-## 📞 Team Communication
 
-- **Daily Standups**: 9 AM PST
-- **Integration Checkpoints**: Every 2 days
-- **Final Demo Prep**: Day before submission
-
-## 🎯 Next Steps for Your Team
-
-1. **Each person should clone the repo** and work on their assigned module
-2. **Set up API keys** for OpenAI and Anthropic
-3. **Test the basic functionality** using the provided scripts
-4. **Implement missing components** (some service files need completion)
-5. **Add real-time audio/video capture** in the Game UI
-6. **Test the complete integration** between all modules
-
----
-
-*Built with ❤️ for Cal Hacks 2024* 
