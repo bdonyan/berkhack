@@ -92,12 +92,12 @@ export default function Home() {
   const endSession = async () => {
     endSessionState();
     terminateConnections();
-    const recordedBlob = await stopStream();
-    
-    const sessionDuration = useGameStore.getState().sessionHistory[0]?.duration || 0;
+    const recordingResult = await stopStream();
 
-    if (recordedBlob) {
+    if (recordingResult) {
+      const { blob: recordedBlob, duration } = recordingResult;
       const url = URL.createObjectURL(recordedBlob);
+      
       toast.success(
         (t) => (
           <span className="flex items-center">
@@ -128,7 +128,7 @@ export default function Home() {
           body: JSON.stringify({
             audioData: audioBase64,
             sessionId: currentSessionId,
-            duration: sessionDuration,
+            duration,
           }),
         });
 
