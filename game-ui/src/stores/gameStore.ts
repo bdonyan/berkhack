@@ -1,5 +1,48 @@
 import { create } from 'zustand';
 import { SpeechFeedback, VisualFeedback, AudienceReaction } from '../../../shared/schemas';
+import { EloScoringSystem } from '@/utils/EloScoringSystem';
+
+const eloSystem = new EloScoringSystem();
+
+// Define complex types locally if not present in shared schemas
+interface DetailedAnalysis {
+  strengths: string[];
+  recommendations: string[];
+}
+
+interface Clarity {
+  score: number;
+  detailedAnalysis: DetailedAnalysis;
+}
+
+interface FillerWords {
+  count: number;
+  detailedAnalysis: DetailedAnalysis;
+}
+
+interface SpeechAnalysis {
+  transcript: string;
+  wpm: number;
+  clarity: Clarity;
+  fillerWords: FillerWords;
+}
+
+interface Session {
+  sessionId: string;
+  startTime: number;
+  endTime: number;
+  duration: number;
+  speechFeedback: SpeechFeedback[];
+  visualFeedback: VisualFeedback[];
+  combinedScore: number;
+  transcript: string;
+}
+
+interface GameSettings {
+  micOn: boolean;
+  videoOn: boolean;
+  audienceSound: boolean;
+}
 
 interface GameState {
   // Session state
@@ -87,6 +130,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (currentSession) {
       const duration = (endTime - currentSession.startTime) / 1000;
       currentSession.duration = duration;
+      currentSession.endTime = endTime;
 
       const speechScores = currentSession.speechFeedback.map((f: SpeechFeedback) => f.overallScore);
       const avgSpeechScore = speechScores.length > 0 ? speechScores.reduce((a: number, b: number) => a + b, 0) / speechScores.length : 0;
@@ -103,11 +147,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       
       currentSession.combinedScore = combinedScore;
 
+      const currentElo = get().currentEloRating;
+      const newElo = eloSystem.updateRating(currentElo, combinedScore, 1200); // 1200 is avg opponent
+
       set({
         isSessionActive: false,
         sessionId: null,
         sessionStartTime: null,
         sessionHistory: [...sessionHistory],
+        currentEloRating: newElo,
       });
     }
   },
