@@ -1,5 +1,0 @@
-Session ID: 1750580405051
-Timestamp: 2025-06-22T08:20:20.534Z
-Transcript:
-Hello, I am trying the words per minute feature.
-

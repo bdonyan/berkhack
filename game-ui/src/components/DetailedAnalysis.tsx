@@ -125,11 +125,40 @@ export const DetailedAnalysis: React.FC<DetailedAnalysisProps> = ({ speechFeedba
         </div>
 
         {/* Clarity Analysis */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center"><BookOpen className="mr-2" /> Clarity Analysis</h3>
+        <div className="border rounded-lg p-4">
+          <h4 className="font-semibold text-gray-800 mb-3 flex items-center">
+            <BookOpen className="w-4 h-4 mr-2" />
+            Clarity Analysis
+          </h4>
+          <div className="mb-3">
+            <div className="grid grid-cols-2 gap-4 mb-3">
+              <div>
+                <span className="text-sm text-gray-600">Articulation:</span>
+                <div className="font-semibold">{clarity.articulation}/100</div>
+              </div>
+              <div>
+                <span className="text-sm text-gray-600">Pronunciation:</span>
+                <div className="font-semibold">{clarity.pronunciation}/100</div>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <span className="text-sm text-gray-600 mr-2">Clarity Score:</span>
+              <div className="flex-1 bg-gray-200 rounded-full h-2 mr-2">
+                <div 
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    clarity.overall >= 80 ? 'bg-green-500' : 
+                    clarity.overall >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                  }`}
+                  style={{ width: `${clarity.overall}%` }}
+                ></div>
+              </div>
+              <span className="text-sm font-semibold">{clarity.overall}/100</span>
+            </div>
+          </div>
+
           {clarity.detailedAnalysis ? (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-700">{clarity.detailedAnalysis.articulation}</p>
+            <div className="bg-gray-50 rounded-lg p-3 space-y-4">
+              <p className="text-sm text-gray-700 italic">"{clarity.detailedAnalysis.articulation}"</p>
               
               {clarity.detailedAnalysis.strengths && clarity.detailedAnalysis.strengths.length > 0 && (
                 <div>

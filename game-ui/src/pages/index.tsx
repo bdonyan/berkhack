@@ -52,6 +52,7 @@ export default function Home() {
   const [transcriptReady, setTranscriptReady] = useState(false);
   const [showAnalysisDashboard, setShowAnalysisDashboard] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState<number>(0);
+  const [isEnding, setIsEnding] = useState(false);
 
   // Mock data for testing dashboard
   const mockVisualFeedback = {
@@ -218,14 +219,15 @@ export default function Home() {
   };
 
   const endSession = async () => {
-    endSessionState();
+    if (isEnding) return;
+    setIsEnding(true);
+
     terminateConnections();
     const recordingResult = await stopStream();
 
     if (recordingResult) {
       const { blob: recordedBlob, duration } = recordingResult;
       const url = URL.createObjectURL(recordedBlob);
-      
       toast.success(
         (t) => (
           <span className="flex items-center">
@@ -244,10 +246,9 @@ export default function Home() {
           duration: 10000, // Keep the toast open longer
         }
       );
-
       try {
+        toast.loading('Analyzing your speech...');
         const audioBase64 = await blobToBase64(recordedBlob);
-        
         const response = await fetch('http://localhost:3001/analyze-speech', {
           method: 'POST',
           headers: {
@@ -259,17 +260,13 @@ export default function Home() {
             duration,
           }),
         });
-
+        toast.dismiss();
         if (response.ok) {
           const feedback = await response.json();
           setSpeechFeedback(feedback);
           toast.success('Transcript processed and saved!');
           setTranscriptReady(true);
-          
-          // Set mock visual feedback for testing
           setVisualFeedback(mockVisualFeedback);
-          
-          // Show analysis dashboard after processing is complete
           setTimeout(() => {
             setShowAnalysisDashboard(true);
           }, 1000);
@@ -277,35 +274,30 @@ export default function Home() {
           const errorData = await response.json();
           const errorMessage = errorData.details || errorData.error || 'Failed to process transcript.';
           toast.error(`Error: ${errorMessage}`);
-          
-          // Set mock data even if speech analysis fails
           setSpeechFeedback(mockSpeechFeedback);
           setVisualFeedback(mockVisualFeedback);
-          
-          // Show dashboard even if there's an error, with available data
           setTimeout(() => {
             setShowAnalysisDashboard(true);
           }, 1000);
         }
       } catch (error) {
+        toast.dismiss();
         console.error("Failed to send audio for analysis", error);
         toast.error('Failed to send audio for analysis.');
-        
-        // Set mock data even if there's an error
         setSpeechFeedback(mockSpeechFeedback);
         setVisualFeedback(mockVisualFeedback);
-        
-        // Show dashboard even if there's an error, with available data
         setTimeout(() => {
           setShowAnalysisDashboard(true);
         }, 1000);
+      } finally {
+        endSessionState();
+        setIsEnding(false);
       }
     } else {
-      // Set mock data even if no recording was made
+      endSessionState();
+      setIsEnding(false);
       setSpeechFeedback(mockSpeechFeedback);
       setVisualFeedback(mockVisualFeedback);
-      
-      // Show dashboard even if no recording was made
       setTimeout(() => {
         setShowAnalysisDashboard(true);
       }, 1000);
@@ -391,6 +383,7 @@ export default function Home() {
               onToggleVideo={toggleVideo}
               isMicActive={isMicOn}
               isVideoActive={isVideoOn}
+              isEnding={isEnding}
             />
 
             {/* Debug Button - Remove this in production */}
@@ -416,7 +409,6 @@ export default function Home() {
 
             {/* Real-time Feedback */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FeedbackPanel speechFeedback={speechFeedback} visualFeedback={visualFeedback} />
               <FeedbackPanel speechFeedback={speechFeedback} visualFeedback={visualFeedback} />
             </div>
           </div>
