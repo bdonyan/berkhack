@@ -1,0 +1,5 @@
+Session ID: 1750583621657
+Timestamp: 2025-06-22T09:13:45.941Z
+Transcript:
+This is a great speech.
+

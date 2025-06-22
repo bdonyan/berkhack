@@ -18,6 +18,7 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "fluent-ffmpeg": "^2.1.2",
+    "hume": "^0.11.4",
     "natural": "^6.10.4",
     "node-record-lpcm16": "^1.0.1",
     "openai": "^4.20.1",

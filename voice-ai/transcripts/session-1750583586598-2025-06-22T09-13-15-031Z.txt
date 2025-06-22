@@ -1,0 +1,5 @@
+Session ID: 1750583586598
+Timestamp: 2025-06-22T09:13:15.031Z
+Transcript:
+This is a mock transcript for developmental purposes.
+

@@ -22,7 +22,7 @@ const missions = [
 // For now, use props or Zustand for completion state. Here, just show incomplete for demo.
 export const DailyMissions: React.FC<{ completed?: Record<string, boolean> }> = ({ completed = {} }) => {
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+    <div className="bg-white rounded-2xl shadow-lg p-6 h-full">
       <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
         <span className="mr-2">🔥</span> Daily Missions
       </h3>

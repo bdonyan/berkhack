@@ -57,7 +57,6 @@ interface AnalysisDashboardProps {
   sessionDuration: number;
   onStartNewSession?: () => void;
   onClose?: () => void;
-  visualSkillPrediction?: { predicted: string; confidence: number } | null;
 }
 
 export const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({
@@ -68,7 +67,6 @@ export const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({
   sessionDuration,
   onStartNewSession,
   onClose,
-  visualSkillPrediction
 }) => {
   if (!isVisible) return null;
 
@@ -140,54 +138,6 @@ export const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({
         </div>
 
         <div className="p-6">
-          {/* ML Model Prediction Section */}
-          {visualSkillPrediction && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-8 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-6 border border-purple-200"
-            >
-              <div className="flex items-center mb-4">
-                <Brain className="w-6 h-6 text-purple-600 mr-2" />
-                <h2 className="text-2xl font-bold text-gray-900">🤖 ML Model Prediction</h2>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white rounded-lg p-4 shadow-sm">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-600">Predicted Skill Level</span>
-                    <Target className="w-4 h-4 text-gray-400" />
-                  </div>
-                  <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getSkillLevelColor(visualSkillPrediction.predicted)}`}>
-                    {visualSkillPrediction.predicted.charAt(0).toUpperCase() + visualSkillPrediction.predicted.slice(1)}
-                  </div>
-                </div>
-                
-                <div className="bg-white rounded-lg p-4 shadow-sm">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-600">Confidence</span>
-                    <Zap className="w-4 h-4 text-gray-400" />
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-full bg-gray-200 rounded-full h-2 mr-3">
-                      <div 
-                        className="bg-gradient-to-r from-green-400 to-blue-500 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${visualSkillPrediction.confidence * 100}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-sm font-medium text-gray-900">
-                      {Math.round(visualSkillPrediction.confidence * 100)}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-4 text-sm text-gray-600">
-                <p>🎯 <strong>ML Model Analysis:</strong> Based on your visual presentation data, our trained Naive Bayes model predicts your skill level with {Math.round(visualSkillPrediction.confidence * 100)}% confidence.</p>
-              </div>
-            </motion.div>
-          )}
-
           {/* Session Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <motion.div

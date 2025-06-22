@@ -131,16 +131,6 @@ export const DetailedAnalysis: React.FC<DetailedAnalysisProps> = ({ speechFeedba
             Clarity Analysis
           </h4>
           <div className="mb-3">
-            <div className="grid grid-cols-2 gap-4 mb-3">
-              <div>
-                <span className="text-sm text-gray-600">Articulation:</span>
-                <div className="font-semibold">{clarity.articulation}/100</div>
-              </div>
-              <div>
-                <span className="text-sm text-gray-600">Pronunciation:</span>
-                <div className="font-semibold">{clarity.pronunciation}/100</div>
-              </div>
-            </div>
             <div className="flex items-center">
               <span className="text-sm text-gray-600 mr-2">Clarity Score:</span>
               <div className="flex-1 bg-gray-200 rounded-full h-2 mr-2">

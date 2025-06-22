@@ -1,3 +1,5 @@
+import { VisualFeedback as SharedVisualFeedback } from '../../../shared/schemas';
+
 // Inlined VisualFeedback type for demo purposes
 /**
  * @typedef {Object} VisualFeedback
@@ -682,7 +684,7 @@ class VisualDataGenerator {
   /**
    * Generate realistic visual feedback with skill-based correlations
    */
-  static generateVisualFeedback(skillLevel: 'beginner' | 'intermediate' | 'advanced' = 'intermediate'): VisualFeedback {
+  static generateVisualFeedback(skillLevel: 'beginner' | 'intermediate' | 'advanced' = 'intermediate'): SharedVisualFeedback {
     // Skill-based multipliers for more realistic correlations
     const skillMultipliers = {
       beginner: { 
@@ -774,41 +776,38 @@ class VisualDataGenerator {
     });
     
     return {
+      timestamp: Date.now(),
       overallScore,
       eyeContact: {
         score: Math.round(eyeContactScore),
-        details: `Maintained eye contact for ${Math.round(eyeContactPercentage)}% of the session with ${Math.round(eyeContactDuration * 100)}% duration`
+        percentage: eyeContactPercentage,
+        duration: eyeContactDuration,
       },
       facialExpression: {
         score: Math.round(facialExpressionScore),
-        details: `Expressive facial features with ${Math.round(emotionStability * 100)}% stability`
+        emotion: 'confident',
+        confidence: emotionConfidence
       },
       posture: {
         score: Math.round(postureScore),
-        details: `Good posture alignment (${Math.round(postureAlignment * 100)}%) with ${Math.round(postureStability * 100)}% stability`
+        stance: 'good',
       },
       gestures: {
         score: Math.round(gestureScore),
-        details: `Effective hand gestures with ${Math.round(gestureVariety * 100)}% variety and ${Math.round(gestureConfidence * 100)}% confidence`
+        detected: this.getRandomSubset(this.GESTURES, 3),
+        appropriateness: gestureConfidence * 100,
+        frequency: 5
       },
       bodyLanguage: {
         overall: Math.round(bodyLanguageScore),
-        details: `Coordinated body language with ${Math.round(overallStability * 100)}% stability and ${Math.round(overallConfidence * 100)}% confidence`
+        openness: overallConfidence * 100,
+        energy: overallConfidence * 100,
+        engagement: overallConfidence * 100,
       },
-      suggestions,
-      improvements,
-      positiveFeedback,
-      technicalMetrics: {
-        eyeContactDuration,
-        eyeContactPercentage,
-        emotionStability,
-        emotionConfidence,
-        postureStability,
-        postureAlignment,
-        gestureConfidence,
-        gestureVariety,
-        overallStability,
-        overallConfidence
+      feedback: {
+        positive: positiveFeedback,
+        improvements: improvements,
+        suggestions: suggestions
       }
     };
   }
@@ -1098,7 +1097,7 @@ class VisualDataGenerator {
   /**
    * Add realistic noise to feedback data
    */
-  private static addNoiseToFeedback(feedback: VisualFeedback): VisualFeedback {
+  private static addNoiseToFeedback(feedback: SharedVisualFeedback): SharedVisualFeedback {
     const noiseFactor = 0.1; // 10% noise
     
     const addNoise = (value: number): number => {
@@ -1109,26 +1108,32 @@ class VisualDataGenerator {
     return {
       ...feedback,
       overallScore: Math.round(addNoise(feedback.overallScore / 100) * 100),
-      eyeContact: feedback.eyeContact ? {
-        ...feedback.eyeContact,
-        score: Math.round(addNoise(feedback.eyeContact.score / 100) * 100)
-      } : undefined,
-      facialExpression: feedback.facialExpression ? {
-        ...feedback.facialExpression,
-        score: Math.round(addNoise(feedback.facialExpression.score / 100) * 100)
-      } : undefined,
-      posture: feedback.posture ? {
-        ...feedback.posture,
-        score: Math.round(addNoise(feedback.posture.score / 100) * 100)
-      } : undefined,
-      gestures: feedback.gestures ? {
-        ...feedback.gestures,
-        score: Math.round(addNoise(feedback.gestures.score / 100) * 100)
-      } : undefined,
-      bodyLanguage: feedback.bodyLanguage ? {
-        ...feedback.bodyLanguage,
-        overall: Math.round(addNoise(feedback.bodyLanguage.overall / 100) * 100)
-      } : undefined
+      eyeContact: {
+        percentage: feedback.eyeContact?.percentage ?? 0,
+        duration: feedback.eyeContact?.duration ?? 0,
+        score: Math.round(addNoise((feedback.eyeContact?.score ?? 0) / 100) * 100),
+      },
+      facialExpression: {
+        emotion: feedback.facialExpression?.emotion ?? 'neutral',
+        confidence: feedback.facialExpression?.confidence ?? 0,
+        score: Math.round(addNoise((feedback.facialExpression?.score ?? 0) / 100) * 100),
+      },
+      posture: {
+        stance: feedback.posture?.stance ?? 'good',
+        score: Math.round(addNoise((feedback.posture?.score ?? 0) / 100) * 100),
+      },
+      gestures: {
+        detected: feedback.gestures?.detected ?? [],
+        appropriateness: feedback.gestures?.appropriateness ?? 0,
+        frequency: feedback.gestures?.frequency ?? 0,
+        score: Math.round(addNoise((feedback.gestures?.score ?? 0) / 100) * 100),
+      },
+      bodyLanguage: {
+        openness: feedback.bodyLanguage?.openness ?? 0,
+        energy: feedback.bodyLanguage?.energy ?? 0,
+        engagement: feedback.bodyLanguage?.engagement ?? 0,
+        overall: Math.round(addNoise((feedback.bodyLanguage?.overall ?? 0) / 100) * 100),
+      },
     };
   }
 
@@ -1308,7 +1313,7 @@ class VisualDataGenerator {
   /**
    * Get visual skill prediction using the trained model
    */
-  static getVisualSkillPrediction(feedback: any): { predicted: string; confidence: number } {
+  static getVisualSkillPrediction(feedback: SharedVisualFeedback): { predicted: string; confidence: number } {
     if (!_model) {
       console.warn('Model not trained yet, returning default prediction');
       return { predicted: 'intermediate', confidence: 50 };

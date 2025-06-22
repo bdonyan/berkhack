@@ -1,0 +1,5 @@
+Session ID: 1750583497102
+Timestamp: 2025-06-22T09:11:54.130Z
+Transcript:
+Oh, wait, why does it keep going down to zero sessions? Oh, that's what that's the issue That's the issue because it's ready. Hey go in the code the code itself. You have never even looked at the code It uses average sessions as part of it
+

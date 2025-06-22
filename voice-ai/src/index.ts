@@ -6,7 +6,8 @@ import dotenv from 'dotenv';
 import { SpeechAnalyzer } from './services/SpeechAnalyzer';
 import { FeedbackGenerator } from './services/FeedbackGenerator';
 import { WebSocketManager } from './services/WebSocketManager';
-import { SpeechFeedback } from '../../shared/schemas';
+import { HumeAnalyzer } from './services/HumeAnalyzer';
+import { SpeechFeedback, VisualFeedback } from '../../shared/schemas';
 
 dotenv.config();
 
@@ -30,6 +31,16 @@ app.use(express.urlencoded({ extended: true }));
 const speechAnalyzer = new SpeechAnalyzer();
 const feedbackGenerator = new FeedbackGenerator();
 const wsManager = new WebSocketManager(io);
+const humeAnalyzer = new HumeAnalyzer();
+
+// Test Hume AI connection on startup
+humeAnalyzer.testConnection().then(success => {
+  if (success) {
+    console.log('✅ Hume AI connection test successful');
+  } else {
+    console.log('⚠️ Hume AI connection test failed - using fallback mode');
+  }
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -138,6 +149,90 @@ app.post('/stream-speech', async (req, res) => {
   } catch (error) {
     console.error('Stream processing error:', error);
     res.status(500).json({ error: 'Stream processing failed' });
+  }
+});
+
+// Hume AI expression analysis endpoint
+app.post('/analyze-expression', async (req, res) => {
+  try {
+    const { audioData, videoData, sessionId } = req.body;
+    
+    if (!audioData) {
+      return res.status(400).json({ error: 'Audio data is required' });
+    }
+
+    // Convert base64 data to buffer
+    const audioBase64 = audioData.split(';base64,').pop();
+    if (!audioBase64) {
+      return res.status(400).json({ error: 'Invalid audio data format' });
+    }
+    const audioBuffer = Buffer.from(audioBase64, 'base64');
+
+    let videoBuffer: Buffer | undefined;
+    if (videoData) {
+      const videoBase64 = videoData.split(';base64,').pop();
+      if (videoBase64) {
+        videoBuffer = Buffer.from(videoBase64, 'base64');
+      }
+    }
+
+    // Analyze expressions using Hume AI
+    const expressionResult = await humeAnalyzer.analyzeExpression(audioBuffer, videoBuffer);
+    const summary = humeAnalyzer.getExpressionSummary(expressionResult);
+    
+    // Convert Hume AI results to VisualFeedback format
+    const visualFeedback: VisualFeedback = {
+      timestamp: Date.now(),
+      eyeContact: {
+        percentage: summary.engagement * 100,
+        duration: 0, // Will be calculated from video analysis
+        score: summary.engagement * 100
+      },
+      facialExpression: {
+        emotion: summary.dominantEmotion as any,
+        confidence: summary.confidence * 100,
+        score: summary.confidence * 100
+      },
+      posture: {
+        stance: 'good', // Default, will be enhanced with video analysis
+        score: 80
+      },
+      gestures: {
+        detected: expressionResult.expressions.map(exp => exp.name),
+        appropriateness: summary.engagement * 100,
+        frequency: expressionResult.expressions.length,
+        score: summary.engagement * 100
+      },
+      bodyLanguage: {
+        openness: summary.engagement * 100,
+        energy: summary.confidence * 100,
+        engagement: summary.engagement * 100,
+        overall: summary.engagement * 100
+      },
+      feedback: {
+        positive: [`Strong ${summary.dominantEmotion} detected`],
+        improvements: [],
+        suggestions: []
+      },
+      overallScore: summary.engagement * 100
+    };
+    
+    // Broadcast expression analysis via WebSocket
+    wsManager.broadcastFeedback({
+      type: 'visual_feedback',
+      data: visualFeedback,
+      timestamp: Date.now()
+    });
+
+    res.json({
+      success: true,
+      expressionAnalysis: expressionResult,
+      summary,
+      visualFeedback
+    });
+  } catch (error) {
+    console.error('Expression analysis error:', error);
+    res.status(500).json({ error: 'Expression analysis failed' });
   }
 });
 

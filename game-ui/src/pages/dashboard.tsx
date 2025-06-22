@@ -6,7 +6,6 @@ import { motion } from 'framer-motion';
 import { Mic, Video, Trophy, BarChart3, Users, Settings, Download, Database, LogOut, User } from 'lucide-react';
 import { EloScoringSystem } from '../utils/EloScoringSystem';
 import { VisualDataGenerator } from '../utils/VisualDataGenerator';
-import { AudienceSimulator } from '@/components/AudienceSimulator';
 import { FeedbackPanel } from '@/components/FeedbackPanel';
 import PerformanceMetrics from '@/components/PerformanceMetrics';
 import { SessionControls } from '@/components/SessionControls';
@@ -40,7 +39,6 @@ export default function Dashboard() {
     isSessionActive,
     speechFeedback,
     visualFeedback,
-    audienceReaction,
     currentEloRating,
     sessionHistory,
     settings,
@@ -48,7 +46,6 @@ export default function Dashboard() {
     endSession: endSessionState,
     setSpeechFeedback,
     setVisualFeedback,
-    setAudienceReaction,
   } = useGameStore();
 
   const { xp, streak } = useGameStore();
@@ -62,7 +59,6 @@ export default function Dashboard() {
   const [showAnalysisDashboard, setShowAnalysisDashboard] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState<number>(0);
   const [isEnding, setIsEnding] = useState(false);
-  const [visualSkillPrediction, setVisualSkillPrediction] = useState<{ predicted: string; confidence: number } | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const eloSystem = new EloScoringSystem();
@@ -103,13 +99,6 @@ export default function Dashboard() {
       }, 500);
     }
   }, [showAnalysisDashboard]);
-
-  // Whenever visualFeedback changes, update the prediction
-  useEffect(() => {
-    if (visualFeedback) {
-      setVisualSkillPrediction(VisualDataGenerator.getVisualSkillPrediction(visualFeedback));
-    }
-  }, [visualFeedback]);
 
   const handleStartNewSession = () => {
     setShowAnalysisDashboard(false);
@@ -322,7 +311,6 @@ export default function Dashboard() {
           <span className="font-bold">{streak} day streak</span>
         </div>
       </div>
-      <DailyMissions />
 
       <main className="container mx-auto px-4 py-8">
         {/* Welcome Section */}
@@ -351,7 +339,7 @@ export default function Dashboard() {
               <p className="text-gray-600">Your public speaking skill level</p>
             </div>
             <div className="text-right">
-              <div className="text-4xl font-bold text-primary-600">{user.eloRating}</div>
+              <div className="text-4xl font-bold text-primary-600">{currentEloRating}</div>
               <div className="text-sm text-gray-500">points</div>
             </div>
           </div>
@@ -359,15 +347,15 @@ export default function Dashboard() {
           {/* Rating Badge */}
           <div className="mt-4">
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-              user.eloRating >= 1500 ? 'bg-success-100 text-success-800' :
-              user.eloRating >= 1200 ? 'bg-primary-100 text-primary-800' :
-              user.eloRating >= 900 ? 'bg-warning-100 text-warning-800' :
+              currentEloRating >= 1500 ? 'bg-success-100 text-success-800' :
+              currentEloRating >= 1200 ? 'bg-primary-100 text-primary-800' :
+              currentEloRating >= 900 ? 'bg-warning-100 text-warning-800' :
               'bg-danger-100 text-danger-800'
             }`}>
               <Trophy className="w-4 h-4 mr-1" />
-              {user.eloRating >= 1500 ? 'Expert Speaker' :
-               user.eloRating >= 1200 ? 'Advanced Speaker' :
-               user.eloRating >= 900 ? 'Intermediate Speaker' :
+              {currentEloRating >= 1500 ? 'Expert Speaker' :
+               currentEloRating >= 1200 ? 'Advanced Speaker' :
+               currentEloRating >= 900 ? 'Intermediate Speaker' :
                'Beginner Speaker'}
             </span>
           </div>
@@ -413,12 +401,77 @@ export default function Dashboard() {
               </button>
             </div>
 
-            {/* Audience Simulator */}
-            <AudienceSimulator 
-              engagement={audienceReaction?.engagement || 0}
-              attention={audienceReaction?.attention || 0}
-              positiveFeedback={audienceReaction?.positiveFeedback || 0}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Daily Missions */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="h-full"
+              >
+                <DailyMissions />
+              </motion.div>
+
+              {/* Quick Stats */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-2xl shadow-lg p-6"
+              >
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Stats</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Total Sessions</span>
+                    <span className="font-semibold">{sessionHistory.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Best Score</span>
+                    <span className="font-semibold text-success-600">{Math.max(...sessionHistory.map(s => s.combinedScore), 0)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Average Score</span>
+                    <span className="font-semibold">{
+                      sessionHistory.length > 0
+                        ? Math.round(sessionHistory.reduce((acc, s) => acc + s.combinedScore, 0) / sessionHistory.length)
+                        : 0
+                    }</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Member Since</span>
+                    <span className="font-semibold text-primary-600">
+                      {new Date(user.joinDate).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Settings */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="bg-white rounded-2xl shadow-lg p-6"
+              >
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <Settings className="w-5 h-5 mr-2" />
+                  Settings
+                </h3>
+                <div className="space-y-3">
+                  <label className="flex items-center">
+                    <input type="checkbox" className="mr-2" checked={settings.enableRealTimeFeedback} readOnly />
+                    <span className="text-sm text-gray-600">Real-time feedback</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="checkbox" className="mr-2" checked={settings.enableEloScoring} readOnly />
+                    <span className="text-sm text-gray-600">Elo scoring</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="checkbox" className="mr-2" />
+                    <span className="text-sm text-gray-600">Advanced difficulty</span>
+                  </label>
+                </div>
+              </motion.div>
+            </div>
 
             {/* Real-time Feedback */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -439,66 +492,6 @@ export default function Dashboard() {
               sessionId={!isSessionActive && currentSessionId ? currentSessionId : undefined} 
               transcriptReady={transcriptReady}
             />
-
-            {/* Quick Stats */}
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="bg-white rounded-2xl shadow-lg p-6"
-            >
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Stats</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Total Sessions</span>
-                  <span className="font-semibold">{user.totalSessions}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Best Score</span>
-                  <span className="font-semibold text-success-600">{user.bestScore}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Average Score</span>
-                  <span className="font-semibold">{user.averageScore}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Member Since</span>
-                  <span className="font-semibold text-primary-600">
-                    {new Date(user.joinDate).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Settings */}
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-white rounded-2xl shadow-lg p-6"
-            >
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Settings className="w-5 h-5 mr-2" />
-                Settings
-              </h3>
-              <div className="space-y-3">
-                <label className="flex items-center">
-                  <input type="checkbox" className="mr-2" checked={settings.enableRealTimeFeedback} readOnly />
-                  <span className="text-sm text-gray-600">Real-time feedback</span>
-                </label>
-                <label className="flex items-center">
-                  <input type="checkbox" className="mr-2" checked={settings.enableAudienceReactions} readOnly />
-                  <span className="text-sm text-gray-600">Audience reactions</span>
-                </label>
-                <label className="flex items-center">
-                  <input type="checkbox" className="mr-2" checked={settings.enableEloScoring} readOnly />
-                  <span className="text-sm text-gray-600">Elo scoring</span>
-                </label>
-                <label className="flex items-center">
-                  <input type="checkbox" className="mr-2" />
-                  <span className="text-sm text-gray-600">Advanced difficulty</span>
-                </label>
-              </div>
-            </motion.div>
           </div>
         </div>
       </main>
@@ -512,7 +505,6 @@ export default function Dashboard() {
         sessionDuration={sessionDuration}
         onStartNewSession={handleStartNewSession}
         onClose={() => setShowAnalysisDashboard(false)}
-        visualSkillPrediction={visualSkillPrediction}
       />
     </div>
   );
