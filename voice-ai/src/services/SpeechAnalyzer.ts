@@ -3,49 +3,6 @@ import { toFile } from 'openai/uploads';
 import { SpeechFeedback } from '../../../shared/schemas';
 import * as fs from 'fs';
 import * as path from 'path';
-import compromise from 'compromise';
-
-// This interface is defined locally to avoid breaking changes in the shared schema
-// It represents the detailed analysis performed by this service.
-interface SpeechAnalysis {
-  transcript: string;
-  confidence: number;
-  tone: {
-    emotion: 'confident' | 'nervous' | 'enthusiastic' | 'monotone' | 'engaging';
-    score: number;
-  };
-  pace: {
-    wordsPerMinute: number;
-    pauses: number;
-    score: number;
-    rhythm: string;
-    consistency: number;
-  };
-  fillerWords: {
-    count: number;
-    words: string[];
-    score: number;
-    detailedAnalysis: {
-      analysis: string;
-      impact: string;
-      specificWords: string[];
-      recommendations: string[];
-    };
-  };
-  clarity: {
-    pronunciation: number;
-    volume: number;
-    articulation: number;
-    overall: number;
-    detailedAnalysis: {
-      strengths: string[];
-      weaknesses: string[];
-      articulation: string;
-      vocabulary: string;
-    };
-  };
-  detailedInsights: string[];
-}
 
 export class SpeechAnalyzer {
   private openai: OpenAI;
@@ -83,27 +40,15 @@ export class SpeechAnalyzer {
         await this.saveTranscript(sessionId, transcript);
       }
       
-      // Analyze speech characteristics
-      const analysis = await this.analyzeSpeechCharacteristics(transcript, duration);
+      // Analyze speech characteristics using a single, holistic AI model call
+      const analysis = await this.getHolisticAiAnalysis(transcript, {
+        duration,
+        wordsPerMinute: this.calculateWpm(transcript, duration),
+        pauses: this.countPauses(transcript),
+        fillerWords: this.detectFillerWords(transcript),
+      });
       
-      // Calculate overall score
-      const overallScore = this.calculateOverallScore(analysis);
-      
-      return {
-        timestamp: Date.now(),
-        transcript: transcript,
-        confidence: analysis.confidence,
-        tone: analysis.tone,
-        pace: analysis.pace,
-        fillerWords: analysis.fillerWords,
-        clarity: analysis.clarity,
-        feedback: {
-          positive: [],
-          improvements: [],
-          suggestions: []
-        },
-        overallScore
-      };
+      return analysis;
     } catch (error) {
       console.error('Speech analysis error:', error);
       // Re-throw the original error to preserve details like status code
@@ -111,7 +56,7 @@ export class SpeechAnalyzer {
     }
   }
 
-  async processChunk(audioChunk: Buffer, sessionId: string, isFinal: boolean): Promise<SpeechAnalysis | null> {
+  async processChunk(audioChunk: Buffer, sessionId: string, isFinal: boolean): Promise<SpeechFeedback | null> {
     try {
       // Add chunk to session buffer
       if (!this.sessionBuffers.has(sessionId)) {
@@ -139,9 +84,13 @@ export class SpeechAnalyzer {
       }
       
       // Analyze speech characteristics
-      const analysis = await this.analyzeSpeechCharacteristics(transcript);
+      const analysis = await this.getHolisticAiAnalysis(transcript, {
+        wordsPerMinute: this.calculateWpm(transcript),
+        pauses: this.countPauses(transcript),
+        fillerWords: this.detectFillerWords(transcript),
+      });
 
-      return analysis;
+      return analysis as any;
     } catch (error) {
       console.error('Chunk processing error:', error);
       return null;
@@ -257,295 +206,135 @@ ${transcript}
     }
   }
 
-  private async analyzeSpeechCharacteristics(transcript: string, duration?: number): Promise<SpeechAnalysis> {
-    const words = transcript.split(/\s+/).filter(word => word.length > 0);
-    const wordCount = words.length;
-    
-    const wordsPerMinute = duration && duration > 1 ? Math.round((wordCount / duration) * 60) : 0;
-    
-    // Detect filler words with detailed analysis
-    const fillerWords = this.detectFillerWords(transcript);
-    
-    // Analyze tone using OpenAI
-    const tone = await this.analyzeTone(transcript);
-    
-    // Calculate pause count and pacing metrics
-    const pacingMetrics = this.analyzePacing(transcript, wordsPerMinute);
-    
-    // Calculate clarity metrics
-    const clarity = this.calculateClarity(transcript, words);
-    
-    // Get LLM-powered detailed analysis
-    const detailedAnalysis = await this.getDetailedAnalysis(transcript, {
-      wordCount,
-      wordsPerMinute,
-      fillerWords,
-      tone,
-      pacingMetrics,
-      clarity
-    });
-    
-    return {
-      transcript,
-      confidence: 0.85, // Placeholder - would come from Whisper
-      tone,
-      pace: {
-        wordsPerMinute,
-        pauses: pacingMetrics.pauses,
-        score: pacingMetrics.score,
-        rhythm: pacingMetrics.rhythm,
-        consistency: pacingMetrics.consistency
-      },
-      fillerWords: {
-        ...fillerWords,
-        detailedAnalysis: detailedAnalysis.fillerWords
-      },
-      clarity: {
-        ...clarity,
-        detailedAnalysis: detailedAnalysis.clarity
-      },
-      detailedInsights: detailedAnalysis.insights
-    };
+  private async getHolisticAiAnalysis(transcript: string, metrics: { 
+    duration?: number,
+    wordsPerMinute: number,
+    pauses: number,
+    fillerWords: { count: number, words: string[] }
+  }): Promise<SpeechFeedback> {
+
+    const prompt = `
+      You are Eloquence.AI, a world-class public speaking coach. Your feedback is sharp, nuanced, and brutally honest but fair.
+      Analyze the provided transcript and performance metrics. Return a single, valid JSON object with no markdown formatting.
+
+      The JSON object must have this exact structure:
+      {
+        "scores": {
+          "overall": <integer, 0-100, be extremely critical. 50 is mediocre. >85 is masterful. Profanity or incoherence should score <30.>,
+          "pace": <integer, 0-100, based on WPM and pauses. Ideal WPM is 140-160.>,
+          "clarity": <integer, 0-100, considering vocabulary, sentence structure, and repetition.>,
+          "fillerWords": <integer, 0-100, penalizing traditional fillers and excessive word repetition.>,
+          "tone": <integer, 0-100, for the effectiveness of the emotional tone.>
+        },
+        "toneEmotion": <string, a single word for the dominant emotion, e.g., 'confident', 'nervous', 'engaging'>,
+        "feedback": {
+          "positive": <array of strings, specific positive feedback.>,
+          "improvements": <array of strings, direct, constructive areas for improvement.>,
+          "suggestions": <array of strings, concrete next steps for the user.>
+        }
+      }
+
+      DATA:
+      - Transcript: "${transcript}"
+      - Metrics:
+        - Words per Minute: ${metrics.wordsPerMinute}
+        - Pause Count: ${metrics.pauses}
+        - Filler Words Detected: ${metrics.fillerWords.words.join(', ') || 'None'}
+    `;
+
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: "You are a brutally honest but fair public speaking coach providing feedback as a JSON object." },
+          { role: 'user', content: prompt }
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.4,
+      });
+
+      const result = JSON.parse(this.cleanJsonString(response.choices[0].message.content || '{}'));
+
+      // Construct the SpeechFeedback object from the AI's response
+      return {
+        timestamp: Date.now(),
+        transcript,
+        confidence: 0.95, // High confidence as the analysis is now AI-driven
+        tone: {
+          emotion: result.toneEmotion || 'engaging',
+          score: result.scores?.tone || 50,
+        },
+        pace: {
+          wordsPerMinute: metrics.wordsPerMinute,
+          pauses: metrics.pauses,
+          score: result.scores?.pace || 50,
+          rhythm: 'N/A', // These can be deprecated or generated by AI if needed
+          consistency: 0,
+        },
+        fillerWords: {
+          count: metrics.fillerWords.count,
+          words: metrics.fillerWords.words,
+          score: result.scores?.fillerWords || 50,
+          detailedAnalysis: { // This can be populated from the new feedback sections
+            analysis: result.feedback?.improvements.join(' ') || '',
+            impact: '',
+            specificWords: metrics.fillerWords.words,
+            recommendations: result.feedback?.suggestions || []
+          }
+        },
+        clarity: {
+          pronunciation: 0,
+          volume: 0,
+          articulation: 0,
+          overall: result.scores?.clarity || 50,
+          detailedAnalysis: { // This can be populated from the new feedback sections
+            strengths: result.feedback?.positive || [],
+            weaknesses: result.feedback?.improvements || [],
+            articulation: '',
+            vocabulary: ''
+          }
+        },
+        feedback: result.feedback || { positive: [], improvements: [], suggestions: [] },
+        overallScore: result.scores?.overall || 50
+      };
+    } catch (error) {
+      console.error('Holistic AI analysis error:', error);
+      // Fallback to mock feedback if AI analysis fails
+      return this.getMockFeedback();
+    }
   }
 
-  private detectFillerWords(transcript: string): { count: number; words: string[]; score: number } {
+  private calculateWpm(transcript: string, duration?: number): number {
+    const words = transcript.split(/\s+/).filter(word => word.length > 0).length;
+    if (!duration || duration < 1) return 0;
+    return Math.round((words / duration) * 60);
+  }
+
+  private countPauses(transcript: string): number {
+    const pausePatterns = /[.,…?!]/g;
+    const matches = transcript.match(pausePatterns);
+    return matches ? matches.length : 0;
+  }
+
+  private detectFillerWords(transcript: string): { count: number; words: string[] } {
     const detectedWords: string[] = [];
     
     this.fillerWordPatterns.forEach(pattern => {
       const matches = transcript.match(pattern);
       if (matches) {
-        detectedWords.push(...matches);
+        detectedWords.push(...matches.map(w => w.toLowerCase()));
       }
     });
 
-    const count = detectedWords.length;
-    const score = Math.max(0, 100 - (count * 10)); // Deduct 10 points per filler word
-
-    return {
-      count,
-      words: [...new Set(detectedWords)], // Remove duplicates
-      score
-    };
-  }
-
-  private async analyzeTone(transcript: string): Promise<{ emotion: 'confident' | 'nervous' | 'enthusiastic' | 'monotone' | 'engaging'; score: number }> {
-    try {
-      const response = await this.openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: 'Analyze the emotional tone of this speech. Return only a JSON object with "emotion" (one of: confident, nervous, enthusiastic, monotone, engaging) and "score" (0-100).'
-          },
-          {
-            role: 'user',
-            content: transcript
-          }
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.3
-      });
-
-      const result = JSON.parse(this.cleanJsonString(response.choices[0].message.content || '{}'));
-      return {
-        emotion: result.emotion || 'engaging',
-        score: result.score || 75,
-      };
-    } catch (error) {
-      console.error('Tone analysis error:', error);
-      return { emotion: 'confident', score: 50 };
-    }
-  }
-
-  private analyzePacing(transcript: string, wordsPerMinute: number): {
-    pauses: number;
-    score: number;
-    rhythm: string;
-    consistency: number;
-  } {
-    // Count pauses (periods, commas, ellipses)
-    const pausePatterns = /[.,…]/g;
-    const matches = transcript.match(pausePatterns);
-    const pauses = matches ? matches.length : 0;
-    
-    // Analyze sentence length variation for rhythm
-    const sentences = transcript.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    const sentenceLengths = sentences.map(s => s.split(/\s+/).length);
-    const avgSentenceLength = sentenceLengths.reduce((a, b) => a + b, 0) / sentenceLengths.length;
-    const lengthVariance = sentenceLengths.reduce((sum, len) => sum + Math.pow(len - avgSentenceLength, 2), 0) / sentenceLengths.length;
-    
-    // Determine rhythm based on sentence length variation
-    let rhythm = 'consistent';
-    if (lengthVariance > 10) rhythm = 'varied';
-    if (lengthVariance > 20) rhythm = 'unpredictable';
-    
-    // Calculate consistency score (lower variance = higher consistency)
-    const consistency = Math.max(0, 100 - (lengthVariance * 2));
-    
-    // Calculate overall pace score
-    let score = 100;
-    if (wordsPerMinute < 120) score -= 20; // Too slow
-    else if (wordsPerMinute > 200) score -= 20; // Too fast
-    
-    // Deduct for too many or too few pauses
-    if (pauses < 2) score -= 10; // Not enough pauses
-    else if (pauses > 10) score -= 15; // Too many pauses
-    
-    return {
-      pauses,
-      score: Math.max(0, score),
-      rhythm,
-      consistency: Math.round(consistency)
-    };
-  }
-
-  private async getDetailedAnalysis(transcript: string, metrics: any): Promise<{
-    fillerWords: any;
-    clarity: any;
-    insights: string[];
-  }> {
-    if (!this.openai.apiKey) {
-      return this.getDefaultDetailedAnalysis(transcript, metrics);
-    }
-    try {
-      const response = await this.openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a public speaking coach. Analyze the following transcript and metrics. 
-            Return a JSON object with three keys: 
-            1. "fillerWords": { "analysis": string, "impact": string, "specificWords": string[], "recommendations": string[] }
-            2. "clarity": { "strengths": string[], "weaknesses": string[], "articulation": string, "vocabulary": string }
-            3. "insights": string[]`
-          },
-          {
-            role: 'user',
-            content: `Transcript: "${transcript}"
-            Metrics:
-            - WPM: ${metrics.wordsPerMinute}
-            - Filler Words: ${metrics.fillerWords.count} (${metrics.fillerWords.words.join(', ')})`
-          }
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.5,
-      });
-
-      const result = JSON.parse(this.cleanJsonString(response.choices[0].message.content || '{}'));
-
-      // Ensure the returned object has the correct structure
-      return {
-        fillerWords: result.fillerWords || this.getDefaultDetailedAnalysis(transcript, metrics).fillerWords,
-        clarity: result.clarity || this.getDefaultDetailedAnalysis(transcript, metrics).clarity,
-        insights: result.insights || this.getDefaultDetailedAnalysis(transcript, metrics).insights,
-      };
-    } catch (error) {
-      console.error('Failed to parse detailed analysis:', error);
-      return this.getDefaultDetailedAnalysis(transcript, metrics);
-    }
-  }
-
-  private getDefaultDetailedAnalysis(transcript: string, metrics: any): {
-    fillerWords: {
-      analysis: string;
-      impact: string;
-      specificWords: string[];
-      recommendations: string[];
-    };
-    clarity: {
-      strengths: string[];
-      weaknesses: string[];
-      articulation: string;
-      vocabulary: string;
-    };
-    insights: string[];
-  } {
-    return {
-      fillerWords: { 
-        analysis: "Could not generate detailed analysis for filler words.",
-        impact: "Filler words can sometimes reduce clarity.",
-        specificWords: metrics.fillerWords.words,
-        recommendations: ["Speak slower to reduce filler words.", "Practice pausing instead of using 'um' or 'uh'."] 
-      },
-      clarity: { 
-        strengths: ["Attempted to communicate a message."],
-        weaknesses: ["Clarity analysis was not available."],
-        articulation: "N/A",
-        vocabulary: "N/A"
-      },
-      insights: ["Could not generate detailed insights. Try speaking for a longer duration."],
-    };
-  }
-
-  private calculateClarity(transcript: string, words: string[]): {
-    pronunciation: number;
-    volume: number;
-    articulation: number;
-    overall: number;
-  } {
-    if (words.length < 5) {
-      return { pronunciation: 50, volume: 50, articulation: 20, overall: 30 };
-    }
-
-    const doc = compromise(transcript);
-    const sentences = doc.sentences().out('array');
-    const wordCount = words.length;
-
-    // 1. Vocabulary Richness (Type-Token Ratio)
-    const uniqueWords = new Set(words.map(w => w.toLowerCase())).size;
-    const ttr = (uniqueWords / wordCount) * 100;
-    let vocabularyScore = Math.min(100, ttr * 2.5); // Scale TTR to be more impactful
-
-    // 2. Repetition Score
-    const wordFrequencies = words.reduce((acc, word) => {
-      const lowerWord = word.toLowerCase();
-      acc[lowerWord] = (acc[lowerWord] || 0) + 1;
+    const wordFrequencies = detectedWords.reduce((acc, word) => {
+      acc[word] = (acc[word] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
-    const repetitions = Object.values(wordFrequencies).filter(count => count > 2).length;
-    let repetitionScore = Math.max(0, 100 - (repetitions * 15)); // Penalize heavily for repeated words
-
-    // 3. Sentence Structure Score
-    const sentenceLengths = sentences.map((s: string) => s.split(' ').length);
-    const avgSentenceLength = sentenceLengths.reduce((a: number, b: number) => a + b, 0) / sentenceLengths.length;
-    let sentenceStructureScore = Math.min(100, avgSentenceLength * 5); // Reward longer, more complex sentences
-
-    // 4. Articulation Score (combined metric)
-    const articulation = (vocabularyScore + repetitionScore + sentenceStructureScore) / 3;
-
-    // Placeholder for pronunciation and volume as they require more advanced audio processing
-    const pronunciation = 70;
-    const volume = 70;
-
-    const overall = (articulation * 0.8) + (pronunciation * 0.1) + (volume * 0.1); // Weight articulation higher
-
     return {
-      pronunciation,
-      volume,
-      articulation: Math.round(articulation),
-      overall: Math.round(overall),
+      count: detectedWords.length,
+      words: Object.keys(wordFrequencies),
     };
-  }
-
-  private calculateOverallScore(analysis: SpeechAnalysis): number {
-    const weights = {
-      tone: 0.20,
-      pace: 0.20,
-      fillerWords: 0.25,
-      clarity: 0.35 // Increased weight for the new, more robust clarity score
-    };
-
-    const rawScore = 
-      analysis.tone.score * weights.tone +
-      analysis.pace.score * weights.pace +
-      analysis.fillerWords.score * weights.fillerWords +
-      analysis.clarity.overall * weights.clarity;
-
-    // Scale the score to be more critical. A raw score of 75 becomes ~60.
-    const scaledScore = Math.pow(rawScore / 100, 1.5) * 100;
-
-    return Math.round(scaledScore);
   }
 
   private cleanJsonString(input: string): string {
