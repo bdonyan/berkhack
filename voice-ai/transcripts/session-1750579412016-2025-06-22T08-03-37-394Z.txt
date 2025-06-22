@@ -1,5 +1,0 @@
-Session ID: 1750579412016
-Timestamp: 2025-06-22T08:03:37.394Z
-Transcript:
-Hello, hello.
-
