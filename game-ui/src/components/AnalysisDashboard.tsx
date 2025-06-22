@@ -265,14 +265,14 @@ export const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({
                     <div className="bg-gray-50 rounded-lg p-3">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-medium">Clarity</span>
-                        <span className={`text-sm font-bold ${getScoreColor(speechFeedback.clarity.score)}`}>
-                          {speechFeedback.clarity.score}/100
+                        <span className={`text-sm font-bold ${getScoreColor(speechFeedback.clarity.overall)}`}>
+                          {speechFeedback.clarity.overall}/100
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div 
-                          className={`h-2 rounded-full ${getScoreBgColor(speechFeedback.clarity.score)}`}
-                          style={{ width: `${speechFeedback.clarity.score}%` }}
+                          className={`h-2 rounded-full ${getScoreBgColor(speechFeedback.clarity.overall)}`}
+                          style={{ width: `${speechFeedback.clarity.overall}%` }}
                         ></div>
                       </div>
                     </div>

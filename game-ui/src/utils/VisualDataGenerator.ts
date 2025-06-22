@@ -13,6 +13,19 @@
  * @property {any} [technicalMetrics]
  */
 
+interface VisualFeedback {
+  overallScore: number;
+  eyeContact?: { score: number; details?: string };
+  facialExpression?: { score: number; details?: string };
+  posture?: { score: number; details?: string };
+  gestures?: { score: number; details?: string };
+  bodyLanguage?: { overall: number; details?: string };
+  suggestions?: string[];
+  improvements?: string[];
+  positiveFeedback?: string[];
+  technicalMetrics?: any;
+}
+
 interface FacialLandmark {
   x: number;
   y: number;
@@ -58,6 +71,7 @@ interface PostureData {
   head: { x: number; y: number; z: number };
   stability: number;
   alignment: number;
+  stance: 'good' | 'slouched' | 'leaning' | 'rigid';
 }
 
 interface EmotionData {
@@ -572,7 +586,8 @@ class VisualDataGenerator {
       },
       head: { x: 320 + (Math.random() - 0.5) * 100, y: 240 + (Math.random() - 0.5) * 80, z: 500 + Math.random() * 200 },
       stability: 0.8 + Math.random() * 0.2,
-      alignment: 0.8 + Math.random() * 0.2
+      alignment: 0.8 + Math.random() * 0.2,
+      stance
     };
   }
 
