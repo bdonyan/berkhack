@@ -6,7 +6,7 @@ import { Mic, Video, Trophy, BarChart3, Users, Settings, Download } from 'lucide
 import { EloScoringSystem } from '../utils/EloScoringSystem';
 import { AudienceSimulator } from '@/components/AudienceSimulator';
 import { FeedbackPanel } from '@/components/FeedbackPanel';
-import { PerformanceMetrics } from '@/components/PerformanceMetrics';
+import PerformanceMetrics from '@/components/PerformanceMetrics';
 import { SessionControls } from '@/components/SessionControls';
 import { TranscriptViewer } from '@/components/TranscriptViewer';
 import { DetailedAnalysis } from '@/components/DetailedAnalysis';
@@ -94,6 +94,8 @@ export default function Home() {
     terminateConnections();
     const recordedBlob = await stopStream();
     
+    const sessionDuration = useGameStore.getState().sessionHistory[0]?.duration || 0;
+
     if (recordedBlob) {
       const url = URL.createObjectURL(recordedBlob);
       toast.success(
@@ -126,6 +128,7 @@ export default function Home() {
           body: JSON.stringify({
             audioData: audioBase64,
             sessionId: currentSessionId,
+            duration: sessionDuration,
           }),
         });
 
@@ -244,10 +247,7 @@ export default function Home() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Performance Metrics */}
-            <PerformanceMetrics 
-              eloRating={currentEloRating}
-              sessionHistory={sessionHistory}
-            />
+            <PerformanceMetrics />
 
             {/* Detailed Analysis */}
             <DetailedAnalysis speechFeedback={speechFeedback} />

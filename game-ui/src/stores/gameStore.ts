@@ -57,20 +57,60 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
   
   // Actions
-  startSession: (sessionId: string) => set({
-    isSessionActive: true,
-    sessionId,
-    sessionStartTime: Date.now(),
-    speechFeedback: null,
-    visualFeedback: null,
-    audienceReaction: null,
-  }),
+  startSession: (sessionId) => {
+    const newSession = {
+      sessionId,
+      startTime: Date.now(),
+      endTime: 0,
+      duration: 0,
+      speechFeedback: [],
+      visualFeedback: [],
+      combinedScore: 0,
+      eloChange: 0,
+      audienceReaction: { engagement: 0, attention: 0, positiveFeedback: 0 },
+    };
+    set({ 
+      isSessionActive: true, 
+      sessionId,
+      sessionStartTime: Date.now(),
+      sessionHistory: [newSession, ...get().sessionHistory] 
+    });
+  },
   
-  endSession: () => set({
-    isSessionActive: false,
-    sessionId: null,
-    sessionStartTime: null,
-  }),
+  endSession: () => {
+    if (!get().isSessionActive) return;
+    
+    const endTime = Date.now();
+    const sessionHistory = get().sessionHistory;
+    const currentSession = sessionHistory[0];
+
+    if (currentSession) {
+      const duration = (endTime - currentSession.startTime) / 1000;
+      currentSession.duration = duration;
+
+      const speechScores = currentSession.speechFeedback.map((f: SpeechFeedback) => f.overallScore);
+      const avgSpeechScore = speechScores.length > 0 ? speechScores.reduce((a: number, b: number) => a + b, 0) / speechScores.length : 0;
+      
+      const visualScores = currentSession.visualFeedback.map((f: VisualFeedback) => f.overallScore);
+      const avgVisualScore = visualScores.length > 0 ? visualScores.reduce((a: number, b: number) => a + b, 0) / visualScores.length : 0;
+
+      let combinedScore = avgSpeechScore;
+      if (avgSpeechScore > 0 && avgVisualScore > 0) {
+        combinedScore = Math.round(avgSpeechScore * 0.7 + avgVisualScore * 0.3);
+      } else if (avgVisualScore > 0) {
+        combinedScore = avgVisualScore;
+      }
+      
+      currentSession.combinedScore = combinedScore;
+
+      set({
+        isSessionActive: false,
+        sessionId: null,
+        sessionStartTime: null,
+        sessionHistory: [...sessionHistory],
+      });
+    }
+  },
   
   setSpeechFeedback: (feedback: SpeechFeedback) => set({
     speechFeedback: feedback,

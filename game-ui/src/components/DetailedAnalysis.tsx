@@ -1,6 +1,6 @@
 import React from 'react';
 import { SpeechFeedback } from '../../../shared/schemas';
-import { TrendingUp, TrendingDown, Target, Lightbulb, Mic, Clock, FileText } from 'lucide-react';
+import { TrendingUp, TrendingDown, Target, Lightbulb, Mic, Clock, FileText, BookOpen } from 'lucide-react';
 
 interface DetailedAnalysisProps {
   speechFeedback: SpeechFeedback | null;
@@ -107,7 +107,7 @@ export const DetailedAnalysis: React.FC<DetailedAnalysisProps> = ({ speechFeedba
             <div className="bg-gray-50 rounded-lg p-3">
               <p className="text-sm text-gray-700 mb-2">{fillerWords.detailedAnalysis.analysis}</p>
               <p className="text-sm text-gray-600 mb-3">{fillerWords.detailedAnalysis.impact}</p>
-              {fillerWords.detailedAnalysis.recommendations.length > 0 && (
+              {fillerWords.detailedAnalysis.recommendations && fillerWords.detailedAnalysis.recommendations.length > 0 && (
                 <div>
                   <h5 className="text-sm font-semibold text-gray-800 mb-2">Recommendations:</h5>
                   <ul className="text-sm text-gray-700 space-y-1">
@@ -125,33 +125,13 @@ export const DetailedAnalysis: React.FC<DetailedAnalysisProps> = ({ speechFeedba
         </div>
 
         {/* Clarity Analysis */}
-        <div className="border rounded-lg p-4">
-          <h4 className="font-semibold text-gray-800 mb-3 flex items-center">
-            <FileText className="w-4 h-4 mr-2" />
-            Clarity Analysis
-          </h4>
-          <div className="grid grid-cols-2 gap-4 mb-3">
-            <div>
-              <span className="text-sm text-gray-600">Pronunciation:</span>
-              <div className="font-semibold">{clarity.pronunciation}/100</div>
-            </div>
-            <div>
-              <span className="text-sm text-gray-600">Volume:</span>
-              <div className="font-semibold">{clarity.volume}/100</div>
-            </div>
-            <div>
-              <span className="text-sm text-gray-600">Articulation:</span>
-              <div className="font-semibold">{clarity.articulation}/100</div>
-            </div>
-            <div>
-              <span className="text-sm text-gray-600">Overall:</span>
-              <div className="font-semibold">{clarity.overall}/100</div>
-            </div>
-          </div>
-          
-          {clarity.detailedAnalysis && (
-            <div className="bg-gray-50 rounded-lg p-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center"><BookOpen className="mr-2" /> Clarity Analysis</h3>
+          {clarity.detailedAnalysis ? (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-700">{clarity.detailedAnalysis.articulation}</p>
+              
+              {clarity.detailedAnalysis.strengths && clarity.detailedAnalysis.strengths.length > 0 && (
                 <div>
                   <h5 className="text-sm font-semibold text-green-700 mb-2">Strengths:</h5>
                   <ul className="text-sm text-gray-700 space-y-1">
@@ -163,8 +143,11 @@ export const DetailedAnalysis: React.FC<DetailedAnalysisProps> = ({ speechFeedba
                     ))}
                   </ul>
                 </div>
+              )}
+
+              {clarity.detailedAnalysis.weaknesses && clarity.detailedAnalysis.weaknesses.length > 0 && (
                 <div>
-                  <h5 className="text-sm font-semibold text-red-700 mb-2">Areas to Improve:</h5>
+                  <h5 className="text-sm font-semibold text-red-700 mb-2">Areas for Improvement:</h5>
                   <ul className="text-sm text-gray-700 space-y-1">
                     {clarity.detailedAnalysis.weaknesses.map((weakness, index) => (
                       <li key={index} className="flex items-start">
@@ -174,16 +157,10 @@ export const DetailedAnalysis: React.FC<DetailedAnalysisProps> = ({ speechFeedba
                     ))}
                   </ul>
                 </div>
-              </div>
-              <div className="mt-3 pt-3 border-t">
-                <p className="text-sm text-gray-700 mb-2">
-                  <strong>Articulation:</strong> {clarity.detailedAnalysis.articulation}
-                </p>
-                <p className="text-sm text-gray-700">
-                  <strong>Vocabulary:</strong> {clarity.detailedAnalysis.vocabulary}
-                </p>
-              </div>
+              )}
             </div>
+          ) : (
+            <p className="text-sm text-gray-500">No detailed clarity analysis available.</p>
           )}
         </div>
 

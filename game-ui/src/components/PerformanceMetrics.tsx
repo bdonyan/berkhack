@@ -1,75 +1,41 @@
 import React from 'react';
+import { useGameStore } from '../stores/gameStore';
 
-interface PerformanceMetricsProps {
-  eloRating: number;
-  sessionHistory: any[];
-}
+const PerformanceMetrics: React.FC = () => {
+  const { sessionHistory, currentEloRating } = useGameStore(state => ({
+    sessionHistory: state.sessionHistory,
+    currentEloRating: state.currentEloRating,
+  }));
 
-export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
-  eloRating,
-  sessionHistory
-}) => {
-  const recentSessions = sessionHistory.slice(-5);
+  const completedSessions = sessionHistory.filter(s => s.endTime > 0);
+  
+  const avgScore = completedSessions.length > 0 
+    ? Math.round(completedSessions.reduce((acc, s) => acc + s.combinedScore, 0) / completedSessions.length)
+    : 0;
+
+  const totalDuration = completedSessions.reduce((acc, s) => acc + s.duration, 0);
+  const avgDuration = completedSessions.length > 0 ? Math.round(totalDuration / completedSessions.length) : 0;
   
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h3 className="text-lg font-semibold mb-4 flex items-center">
-        <span className="mr-2">📊</span>
-        Performance Metrics
-      </h3>
-      
-      <div className="space-y-4">
-        {/* Elo Rating */}
-        <div className="text-center p-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg text-white">
-          <h4 className="text-sm font-medium mb-1">Current Elo Rating</h4>
-          <div className="text-3xl font-bold">{eloRating}</div>
-          <p className="text-sm opacity-90">
-            {eloRating >= 2000 ? "Grandmaster" :
-             eloRating >= 1800 ? "Master" :
-             eloRating >= 1600 ? "Expert" :
-             eloRating >= 1400 ? "Advanced" :
-             eloRating >= 1200 ? "Intermediate" : "Beginner"}
-          </p>
-        </div>
-        
-        {/* Recent Sessions */}
-        <div>
-          <h4 className="font-medium text-gray-700 mb-2">Recent Sessions</h4>
-          {recentSessions.length > 0 ? (
-            <div className="space-y-2">
-              {recentSessions.map((session, index) => (
-                <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                  <span className="text-sm text-gray-600">
-                    Session {sessionHistory.length - recentSessions.length + index + 1}
-                  </span>
-                  <span className="text-sm font-medium">
-                    Score: {session.score || 0}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">No sessions yet</p>
-          )}
-        </div>
-        
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="text-center p-3 bg-blue-50 rounded-lg">
-            <div className="text-2xl font-bold text-blue-600">
-              {sessionHistory.length}
-            </div>
-            <div className="text-xs text-blue-600">Total Sessions</div>
-          </div>
-          <div className="text-center p-3 bg-green-50 rounded-lg">
-            <div className="text-2xl font-bold text-green-600">
-              {sessionHistory.length > 0 ? 
-                Math.round(sessionHistory.reduce((sum, s) => sum + (s.score || 0), 0) / sessionHistory.length) : 0}
-            </div>
-            <div className="text-xs text-green-600">Avg Score</div>
-          </div>
-        </div>
+    <div className="grid grid-cols-4 gap-4 text-white">
+      <div className="text-center p-3 bg-gray-700 rounded-lg">
+        <div className="text-2xl font-bold">{completedSessions.length}</div>
+        <div className="text-xs">Sessions</div>
+      </div>
+      <div className="text-center p-3 bg-blue-500 rounded-lg">
+        <div className="text-2xl font-bold">{currentEloRating}</div>
+        <div className="text-xs">Elo Rating</div>
+      </div>
+      <div className="text-center p-3 bg-green-500 rounded-lg">
+        <div className="text-2xl font-bold">{avgScore}</div>
+        <div className="text-xs">Avg Score</div>
+      </div>
+      <div className="text-center p-3 bg-purple-500 rounded-lg">
+        <div className="text-2xl font-bold">{avgDuration}s</div>
+        <div className="text-xs">Avg Duration</div>
       </div>
     </div>
   );
-}; 
+};
+
+export default PerformanceMetrics; 

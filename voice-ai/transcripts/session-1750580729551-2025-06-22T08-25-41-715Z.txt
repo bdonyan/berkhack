@@ -1,0 +1,5 @@
+Session ID: 1750580729551
+Timestamp: 2025-06-22T08:25:41.715Z
+Transcript:
+Where did the recording go? He's making it make its own model and he doesn't even know how to train a model.
+

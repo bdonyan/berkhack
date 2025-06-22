@@ -1,8 +1,12 @@
-import OpenAI from 'openai';
+import { OpenAI } from 'openai';
+import { toFile } from 'openai/uploads';
 import { SpeechFeedback } from '../../../shared/schemas';
 import * as fs from 'fs';
 import * as path from 'path';
+import compromise from 'compromise';
 
+// This interface is defined locally to avoid breaking changes in the shared schema
+// It represents the detailed analysis performed by this service.
 interface SpeechAnalysis {
   transcript: string;
   confidence: number;
@@ -21,14 +25,24 @@ interface SpeechAnalysis {
     count: number;
     words: string[];
     score: number;
-    detailedAnalysis: any;
+    detailedAnalysis: {
+      analysis: string;
+      impact: string;
+      specificWords: string[];
+      recommendations: string[];
+    };
   };
   clarity: {
     pronunciation: number;
     volume: number;
     articulation: number;
     overall: number;
-    detailedAnalysis: any;
+    detailedAnalysis: {
+      strengths: string[];
+      weaknesses: string[];
+      articulation: string;
+      vocabulary: string;
+    };
   };
   detailedInsights: string[];
 }
@@ -49,13 +63,17 @@ export class SpeechAnalyzer {
     });
     
     // Create transcripts directory
-    this.transcriptsDir = path.join(process.cwd(), 'transcripts');
+    this.transcriptsDir = path.join(__dirname, '../../transcripts');
     if (!fs.existsSync(this.transcriptsDir)) {
       fs.mkdirSync(this.transcriptsDir, { recursive: true });
     }
   }
 
-  async analyzeAudio(audioData: Buffer, sessionId?: string): Promise<SpeechFeedback> {
+  async analyzeAudio(audioData: Buffer, sessionId?: string, duration?: number): Promise<SpeechFeedback> {
+    if (!this.openai.apiKey) {
+      console.warn("OpenAI API key not set. Returning mock feedback.");
+      return this.getMockFeedback();
+    }
     try {
       // Transcribe audio using OpenAI Whisper
       const transcript = await this.transcribeAudio(audioData);
@@ -66,7 +84,7 @@ export class SpeechAnalyzer {
       }
       
       // Analyze speech characteristics
-      const analysis = await this.analyzeSpeechCharacteristics(transcript);
+      const analysis = await this.analyzeSpeechCharacteristics(transcript, duration);
       
       // Calculate overall score
       const overallScore = this.calculateOverallScore(analysis);
@@ -138,9 +156,11 @@ export class SpeechAnalyzer {
     try {
       console.log('Starting transcription with audio data size:', audioData.length);
       
+      const file = await toFile(audioData, 'audio.webm', { type: 'audio/webm' });
+      
       // Use OpenAI Whisper API with audio/webm format
       const response = await this.openai.audio.transcriptions.create({
-        file: new File([audioData], 'audio.webm', { type: 'audio/webm' }),
+        file: file,
         model: 'whisper-1',
         response_format: 'text',
         language: 'en'
@@ -237,12 +257,11 @@ ${transcript}
     }
   }
 
-  private async analyzeSpeechCharacteristics(transcript: string): Promise<SpeechAnalysis> {
+  private async analyzeSpeechCharacteristics(transcript: string, duration?: number): Promise<SpeechAnalysis> {
     const words = transcript.split(/\s+/).filter(word => word.length > 0);
     const wordCount = words.length;
     
-    // Calculate words per minute (assuming 2 seconds of audio)
-    const wordsPerMinute = (wordCount / 2) * 60;
+    const wordsPerMinute = duration && duration > 1 ? Math.round((wordCount / duration) * 60) : 0;
     
     // Detect filler words with detailed analysis
     const fillerWords = this.detectFillerWords(transcript);
@@ -323,21 +342,14 @@ ${transcript}
             content: transcript
           }
         ],
+        response_format: { type: 'json_object' },
         temperature: 0.3
       });
 
-      const result = JSON.parse(response.choices[0].message.content || '{}');
-      const emotion = result.emotion || 'confident';
-      
-      // Ensure the emotion is one of the allowed values
-      const validEmotions: Array<'confident' | 'nervous' | 'enthusiastic' | 'monotone' | 'engaging'> = 
-        ['confident', 'nervous', 'enthusiastic', 'monotone', 'engaging'];
-      
-      const validEmotion = validEmotions.includes(emotion as any) ? emotion as any : 'confident';
-      
+      const result = JSON.parse(this.cleanJsonString(response.choices[0].message.content || '{}'));
       return {
-        emotion: validEmotion,
-        score: result.score || 50
+        emotion: result.emotion || 'engaging',
+        score: result.score || 75,
       };
     } catch (error) {
       console.error('Tone analysis error:', error);
@@ -392,101 +404,76 @@ ${transcript}
     clarity: any;
     insights: string[];
   }> {
+    if (!this.openai.apiKey) {
+      return this.getDefaultDetailedAnalysis(transcript, metrics);
+    }
     try {
-      const prompt = `You are an expert public speaking coach analyzing a speech transcript. Provide detailed, actionable insights.
-
-TRANSCRIPT: "${transcript}"
-
-METRICS:
-- Word Count: ${metrics.wordCount}
-- Words Per Minute: ${metrics.wordsPerMinute}
-- Filler Words: ${metrics.fillerWords.count} (${metrics.fillerWords.words.join(', ')})
-- Tone: ${metrics.tone.emotion} (${metrics.tone.score}/100)
-- Pacing: ${metrics.pacingMetrics.rhythm} rhythm, ${metrics.pacingMetrics.consistency}/100 consistency
-- Clarity: ${metrics.clarity.overall}/100
-
-Provide detailed analysis in JSON format:
-{
-  "fillerWords": {
-    "analysis": "Detailed analysis of filler word usage",
-    "impact": "How filler words affect the speech",
-    "specificWords": ["list of specific filler words found"],
-    "recommendations": ["specific ways to reduce each filler word"]
-  },
-  "clarity": {
-    "strengths": ["what makes the speech clear"],
-    "weaknesses": ["what makes it unclear"],
-    "articulation": "analysis of pronunciation and articulation",
-    "vocabulary": "analysis of word choice and complexity"
-  },
-  "insights": [
-    "3-5 key insights about the speech",
-    "specific observations about delivery",
-    "actionable improvement suggestions"
-  ]
-}
-
-Be specific, constructive, and actionable. Focus on concrete examples from the transcript.`;
-
       const response = await this.openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
           {
             role: 'system',
-            content: 'You are an expert public speaking coach. Provide detailed, actionable analysis in JSON format.'
+            content: `You are a public speaking coach. Analyze the following transcript and metrics. 
+            Return a JSON object with three keys: 
+            1. "fillerWords": { "analysis": string, "impact": string, "specificWords": string[], "recommendations": string[] }
+            2. "clarity": { "strengths": string[], "weaknesses": string[], "articulation": string, "vocabulary": string }
+            3. "insights": string[]`
           },
           {
             role: 'user',
-            content: prompt
+            content: `Transcript: "${transcript}"
+            Metrics:
+            - WPM: ${metrics.wordsPerMinute}
+            - Filler Words: ${metrics.fillerWords.count} (${metrics.fillerWords.words.join(', ')})`
           }
         ],
-        temperature: 0.3
+        response_format: { type: 'json_object' },
+        temperature: 0.5,
       });
 
-      const content = response.choices[0].message.content;
-      if (content) {
-        try {
-          return JSON.parse(content);
-        } catch (parseError) {
-          console.error('Failed to parse detailed analysis:', parseError);
-          return this.getDefaultDetailedAnalysis(transcript, metrics);
-        }
-      }
+      const result = JSON.parse(this.cleanJsonString(response.choices[0].message.content || '{}'));
 
-      return this.getDefaultDetailedAnalysis(transcript, metrics);
+      // Ensure the returned object has the correct structure
+      return {
+        fillerWords: result.fillerWords || this.getDefaultDetailedAnalysis(transcript, metrics).fillerWords,
+        clarity: result.clarity || this.getDefaultDetailedAnalysis(transcript, metrics).clarity,
+        insights: result.insights || this.getDefaultDetailedAnalysis(transcript, metrics).insights,
+      };
     } catch (error) {
-      console.error('Detailed analysis error:', error);
+      console.error('Failed to parse detailed analysis:', error);
       return this.getDefaultDetailedAnalysis(transcript, metrics);
     }
   }
 
   private getDefaultDetailedAnalysis(transcript: string, metrics: any): {
-    fillerWords: any;
-    clarity: any;
+    fillerWords: {
+      analysis: string;
+      impact: string;
+      specificWords: string[];
+      recommendations: string[];
+    };
+    clarity: {
+      strengths: string[];
+      weaknesses: string[];
+      articulation: string;
+      vocabulary: string;
+    };
     insights: string[];
   } {
     return {
-      fillerWords: {
-        analysis: `Found ${metrics.fillerWords.count} filler words in your speech.`,
-        impact: "Filler words can make you sound less confident and professional.",
+      fillerWords: { 
+        analysis: "Could not generate detailed analysis for filler words.",
+        impact: "Filler words can sometimes reduce clarity.",
         specificWords: metrics.fillerWords.words,
-        recommendations: [
-          "Practice pausing instead of using 'um' or 'uh'",
-          "Record yourself and identify filler word patterns",
-          "Use breathing techniques to create natural pauses"
-        ]
+        recommendations: ["Speak slower to reduce filler words.", "Practice pausing instead of using 'um' or 'uh'."] 
       },
-      clarity: {
-        strengths: ["Good effort in communicating your message"],
-        weaknesses: ["Could benefit from clearer articulation"],
-        articulation: "Focus on pronouncing each word clearly",
-        vocabulary: "Consider using more varied and precise language"
+      clarity: { 
+        strengths: ["Attempted to communicate a message."],
+        weaknesses: ["Clarity analysis was not available."],
+        articulation: "N/A",
+        vocabulary: "N/A"
       },
-      insights: [
-        `Your speaking pace of ${metrics.wordsPerMinute} WPM is ${metrics.wordsPerMinute < 150 ? 'good' : 'could be slower'}`,
-        `Your ${metrics.tone.emotion} tone shows ${metrics.tone.score > 70 ? 'good' : 'room for improvement in'} confidence`,
-        "Practice regularly to improve overall speech quality"
-      ]
+      insights: ["Could not generate detailed insights. Try speaking for a longer duration."],
     };
   }
 
@@ -529,5 +516,55 @@ Be specific, constructive, and actionable. Focus on concrete examples from the t
       analysis.fillerWords.score * weights.fillerWords +
       analysis.clarity.overall * weights.clarity
     );
+  }
+
+  private cleanJsonString(input: string): string {
+    return input.replace(/```json/g, '').replace(/```/g, '').trim();
+  }
+
+  private getMockFeedback(): SpeechFeedback {
+    // Implementation of getMockFeedback method
+    return {
+      timestamp: Date.now(),
+      transcript: "This is a mock transcript for development purposes. The actual speech would be transcribed here.",
+      confidence: 0.85,
+      tone: { emotion: 'confident', score: 75 },
+      pace: {
+        wordsPerMinute: 0,
+        pauses: 0,
+        score: 100,
+        rhythm: 'consistent',
+        consistency: 100
+      },
+      fillerWords: {
+        count: 0,
+        words: [],
+        score: 100,
+        detailedAnalysis: {
+          analysis: "No analysis available.",
+          impact: "N/A",
+          specificWords: [],
+          recommendations: []
+        }
+      },
+      clarity: {
+        pronunciation: 85,
+        volume: 80,
+        articulation: 100,
+        overall: 85,
+        detailedAnalysis: {
+          strengths: [],
+          weaknesses: [],
+          articulation: "N/A",
+          vocabulary: "N/A"
+        }
+      },
+      feedback: {
+        positive: [],
+        improvements: [],
+        suggestions: []
+      },
+      overallScore: 100
+    };
   }
 } 

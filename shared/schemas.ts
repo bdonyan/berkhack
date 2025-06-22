@@ -25,7 +25,7 @@ export interface SpeechFeedback {
       impact: string;
       specificWords: string[];
       recommendations: string[];
-    };
+    }
   };
   clarity: {
     pronunciation: number; // 0-100
@@ -37,7 +37,7 @@ export interface SpeechFeedback {
       weaknesses: string[];
       articulation: string;
       vocabulary: string;
-    };
+    }
   };
   feedback: {
     positive: string[];
